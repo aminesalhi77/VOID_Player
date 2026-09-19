@@ -450,8 +450,6 @@ Window {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    root.albumDetail = null;
-                                    root.albumTracks = [];
                                     if (index === 0) { root.currentCategory = ""; root.currentPage = "library"; }
                                     else if (index === 1) root.currentPage = "albums";
                                     else if (index === 2) root.currentPage = "artists";
@@ -949,7 +947,7 @@ Window {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                visible: root.currentPage === "albums" && root.albumDetail === null
+                visible: root.currentPage === "albums"
 
                 Rectangle {
                     Layout.fillWidth: true
@@ -1078,54 +1076,36 @@ Window {
             }
 
             // ============ ALBUM DETAIL (transition view) ============
-            // ============ ALBUM DETAIL (overlay) ============
-            Item {
-                id: albumDetailHost
+            AlbumDetail {
+                id: albumDetailView
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: root.currentPage === "albums" && root.albumDetail !== null
-                clip: true
+                visible: root.albumDetail !== null
+                opacity: root.albumDetail !== null ? 1 : 0
+                scale: root.albumDetail !== null ? 1 : 0.94
 
-                Rectangle {
-                    anchors.fill: parent
-                    color: "#0A0A14"
-                    opacity: parent.visible ? 0.92 : 0
-                }
+                Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
-                AlbumDetail {
-                    id: albumDetailView
-                    anchors.fill: parent
-                    anchors.margins: 0
+                albumName:  root.albumDetail ? root.albumDetail.album : ""
+                artistName: root.albumDetail ? root.albumDetail.artist : ""
+                coverUrl:   root.albumTracks.length > 0 ? root.albumTracks[0].coverUrl : ""
+                tracks:     root.albumTracks
 
-                    opacity: (root.currentPage === "albums" && root.albumDetail !== null) ? 1 : 0
-                    scale:   (root.currentPage === "albums" && root.albumDetail !== null) ? 1 : 0.94
+                accentCyan:   root.accentCyan
+                accentPurple: root.accentPurple
+                accentPink:   root.accentPink
+                textPrimary:  root.textPrimary
+                textDim:      root.textDim
+                textMute:     root.textMute
+                bgPanel:      root.bgPanel
+                bgDeep:       root.bgDeep
 
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                onBack: root.closeAlbum()
 
-                    albumName:  root.albumDetail ? root.albumDetail.album : ""
-                    artistName: root.albumDetail ? root.albumDetail.artist : ""
-                    coverUrl:   (root.albumTracks && root.albumTracks.length > 0)
-                                 ? root.albumTracks[0].coverUrl : ""
-                    tracks:     root.albumTracks ? root.albumTracks : []
-
-                    accentCyan:   root.accentCyan
-                    accentPurple: root.accentPurple
-                    accentPink:   root.accentPink
-                    textPrimary:  root.textPrimary
-                    textDim:      root.textDim
-                    textMute:     root.textMute
-                    bgPanel:      root.bgPanel
-                    bgDeep:       root.bgDeep
-
-                    onBack: root.closeAlbum()
-
-                    onOpenNowPlaying: root.showNowPlaying = true
-
-                    onPlayTrack: function(trackIndex) {
-                        if (trackIndex >= 0 && trackIndex < root.albumTracks.length) {
-                            playback.setQueue(library.tracks(), root.albumTracks[trackIndex].index);
-                        }
+                onPlayTrack: function(trackIndex) {
+                    if (trackIndex >= 0 && trackIndex < root.albumTracks.length) {
+                        playback.setQueue(library.tracks(), root.albumTracks[trackIndex].index);
                     }
                 }
             }
@@ -2670,10 +2650,10 @@ Window {
                     title:        trackModel.data(idx, 258),
                     artist:       art,
                     album:        alb,
-                    durationText: trackModel.data(idx, 264),
-                    coverUrl:     trackModel.data(idx, 266),
+                    durationText: trackModel.data(idx, 265),
+                    coverUrl:     trackModel.data(idx, 267),
                     filePath:     trackModel.data(idx, 257),
-                    trackNumber:  trackModel.data(idx, 268)
+                    trackNumber:  trackModel.data(idx, 263)
                 });
             }
         }
@@ -2682,10 +2662,6 @@ Window {
         });
         root.albumTracks = list;
         root.albumDetail = { album: albumName, artist: artistName };
-        console.log("VOID: openAlbum:", albumName, "→", list.length, "tracks");
-        for (var d = 0; d < Math.min(list.length, 3); d++) {
-            console.log("  [" + d + "]", list[d].title, "cover:", list[d].coverUrl);
-        }
     }
 
     function closeAlbum() {

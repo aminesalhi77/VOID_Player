@@ -1,0 +1,474 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Effects
+
+Item {
+    id: root
+
+    // Signals — Main.qml wires these up
+    signal back()
+    signal playTrack(int trackIndex)
+
+    // Data — set by Main.qml
+    property string albumName: ""
+    property string artistName: ""
+    property string coverUrl: ""
+    property var tracks: []
+    property int gridMode: 0   // 0 = square, 1 = rounded, 2 = circle
+
+    // Colors (passed in or default)
+    property color accentCyan:   "#22D3EE"
+    property color accentPurple: "#A78BFA"
+    property color accentPink:   "#E879F9"
+    property color textPrimary:  "#F2F2F7"
+    property color textDim:      "#8A8AA0"
+    property color textMute:     "#55556A"
+    property color bgPanel:      "#12121F"
+    property color bgDeep:       "#0A0A14"
+
+    // Computed: total duration in minutes
+    readonly property int totalMinutes: {
+        var ms = 0;
+        for (var i = 0; i < tracks.length; i++) {
+            var t = tracks[i].durationText || "0:00";
+            var p = t.split(":");
+            if (p.length === 2) ms += (parseInt(p[0]) * 60 + parseInt(p[1])) * 1000;
+        }
+        return Math.floor(ms / 60000);
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        // ============================================================
+        //  HEADER
+        // ============================================================
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 90
+            color: "transparent"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 28
+                anchors.rightMargin: 28
+                spacing: 16
+
+                // Back button
+                Button {
+                    text: "← Back"
+                    focusPolicy: Qt.NoFocus
+                    onClicked: root.back()
+
+                    background: Rectangle {
+                        implicitWidth: 82
+                        implicitHeight: 36
+                        radius: 10
+                        color: backHover.hovered ? "#26FFFFFF" : "#1AFFFFFF"
+                        border.color: "#33A78BFA"
+                        border.width: 1
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: root.textPrimary
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    HoverHandler { id: backHover }
+                }
+
+                ColumnLayout {
+                    spacing: 2
+                    Text {
+                        text: root.albumName
+                        color: root.textPrimary
+                        font.pixelSize: 22
+                        font.weight: Font.Bold
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        text: root.artistName + "  ·  "
+                              + root.tracks.length + " track"
+                              + (root.tracks.length === 1 ? "" : "s")
+                              + "  ·  " + root.totalMinutes + " min"
+                        color: root.textDim
+                        font.pixelSize: 12
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                // Grid mode toggle
+                RowLayout {
+                    spacing: 4
+
+                    Repeater {
+                        model: [
+                            { mode: 0, icon: "▢" },
+                            { mode: 1, icon: "◻" },
+                            { mode: 2, icon: "◯" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 38; height: 38
+                            radius: 10
+                            color: root.gridMode === modelData.mode
+                                   ? "#33A78BFA"
+                                   : (modeHover.hovered ? "#1AFFFFFF" : "#0DFFFFFF")
+                            border.color: root.gridMode === modelData.mode ? root.accentPurple : "#26FFFFFF"
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 140 } }
+
+                            HoverHandler { id: modeHover }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.icon
+                                color: root.gridMode === modelData.mode ? root.accentCyan : root.textDim
+                                font.pixelSize: 16
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.gridMode = modelData.mode
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        //  MAIN CONTENT
+        // ============================================================
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: 28
+            Layout.rightMargin: 28
+            Layout.bottomMargin: 24
+            spacing: 24
+
+            // ============ LEFT: BIG COVER + PLAY ALL ============
+            ColumnLayout {
+                Layout.preferredWidth: 280
+                Layout.minimumWidth: 280
+                Layout.maximumWidth: 280
+                Layout.alignment: Qt.AlignTop
+                spacing: 14
+
+                // Big cover with animated neon border
+                Rectangle {
+                    Layout.preferredWidth: 280
+                    Layout.preferredHeight: 280
+                    radius: 18
+                    color: root.bgPanel
+                    clip: true
+                    border.width: 2
+                    border.color: root.accentCyan
+
+                    SequentialAnimation on border.color {
+                        running: true
+                        loops: Animation.Infinite
+                        ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                        ColorAnimation { to: "#A78BFA"; duration: 1400 }
+                        ColorAnimation { to: "#E879F9"; duration: 1400 }
+                        ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                    }
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: root.accentPurple
+                        shadowBlur: 0.7
+                    }
+
+                    Image {
+                        anchors.fill: parent
+                        source: root.coverUrl
+                        fillMode: Image.PreserveAspectCrop
+                        visible: root.coverUrl !== ""
+                        asynchronous: true
+                    }
+
+                    // Fallback gradient
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: root.coverUrl === ""
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: "#1A22D3EE" }
+                            GradientStop { position: 1.0; color: "#33A78BFA" }
+                        }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: "#FFFFFF"
+                        font.pixelSize: 96
+                        visible: root.coverUrl === ""
+                    }
+                }
+
+                // Play all button
+                Button {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    text: "▶   Play album"
+                    focusPolicy: Qt.NoFocus
+                    enabled: root.tracks.length > 0
+                    onClicked: {
+                        if (root.tracks.length > 0) root.playTrack(0);
+                    }
+
+                    background: Rectangle {
+                        radius: 12
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: "#40A78BFA" }
+                            GradientStop { position: 1.0; color: "#4022D3EE" }
+                        }
+                        border.color: root.accentCyan
+                        border.width: 1.5
+                        opacity: parent.enabled ? 1.0 : 0.4
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#FFFFFF"
+                        font.pixelSize: 14
+                        font.weight: Font.Bold
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            // ============ RIGHT: SONG GRID ============
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumWidth: 200
+
+                GridView {
+                    id: songsGrid
+                    anchors.fill: parent
+                    clip: true
+                    cellWidth: 180
+                    cellHeight: 200
+                    model: root.tracks
+
+                    // Smooth entrance
+                    add: Transition {
+                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 240; easing.type: Easing.OutCubic }
+                        NumberAnimation { property: "scale"; from: 0.85; to: 1; duration: 280; easing.type: Easing.OutCubic }
+                    }
+
+                    delegate: Item {
+                        id: cardItem
+                        required property var modelData
+                        required property int index
+                        width: 180
+                        height: 200
+
+                        // Animate entrance
+                        opacity: 0
+                        scale: 0.9
+                        Component.onCompleted: {
+                            opacity = 1;
+                            scale = 1;
+                        }
+                        Behavior on opacity { NumberAnimation { duration: 220 } }
+                        Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+                        Rectangle {
+                            id: songCard
+                            anchors.centerIn: parent
+                            width: 168
+                            height: root.gridMode === 2 ? 168 : 188
+
+                            // Grid mode: 0 = square, 1 = rounded, 2 = circle
+                            radius: root.gridMode === 2 ? width / 2 : (root.gridMode === 1 ? 22 : 12)
+
+                            color: "#1A1A28"
+                            border.width: 2
+                            border.color: root.accentCyan
+
+                            property bool hovered: false
+
+                            scale: hovered ? 1.05 : 1.0
+                            Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                            Behavior on radius { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+                            // Animated neon border (cycles cyan → purple → magenta)
+                            SequentialAnimation on border.color {
+             running: true
+                                loops: Animation.Infinite
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
+                                ColorAnimation { to: "#E879F9"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                            }
+
+                            // Subtle glow on hover
+                            layer.enabled: hovered
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: root.accentCyan
+                                shadowBlur: 0.8
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 6
+
+                                // Cover area
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: root.gridMode === 2 ? 0 : 96
+                                    radius: root.gridMode === 2 ? 48 : (root.gridMode === 1 ? 14 : 8)
+                                    color: root.bgPanel
+                                    clip: true
+                                    Behavior on radius { NumberAnimation { duration: 260 } }
+
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.coverUrl
+                                        fillMode: Image.PreserveAspectCrop
+                                        visible: modelData.coverUrl !== "" && root.gridMode !== 2 && root.gridMode !== 2
+                                        asynchronous: true
+                                    }
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        visible: modelData.coverUrl === ""
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: "#1A22D3EE" }
+                                            GradientStop { position: 1.0; color: "#33A78BFA" }
+                                        }
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "♪"
+                                        color: "#FFFFFF"
+                                        font.pixelSize: root.gridMode === 2 ? 56 : 32
+                                        font.weight: Font.Bold
+                                        visible: modelData.coverUrl === "" || root.gridMode === 2
+                                    }
+
+                                    // Track number badge
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.margins: 4
+                                        width: 22; height: 22
+                                        radius: 11
+                                        color: "#CC0A0A14"
+                                        border.color: root.accentCyan
+                                        border.width: 1
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.trackNumber > 0 ? modelData.trackNumber : (index + 1)
+                                            color: root.accentCyan
+                                            font.pixelSize: 10
+                                            font.weight: Font.Bold
+                                            font.family: "JetBrains Mono"
+                                        }
+                                    }
+                                }
+
+                                // Title
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.title
+                                    color: root.textPrimary
+                                    font.pixelSize: 12
+                                    font.weight: Font.Medium
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    wrapMode: Text.NoWrap
+                                }
+
+                                // Artist
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.artist
+                                    color: root.textDim
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+
+                                Item { Layout.fillHeight: true }
+
+                                // Duration
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.durationText
+                                    color: root.textMute
+                                    font.pixelSize: 10
+                                    font.family: "JetBrains Mono"
+                                    horizontalAlignment: Text.AlignRight
+                                }
+                            }
+
+                            // Play button overlay — appears on hover
+                            Rectangle {
+                                id: playOverlay
+                                anchors.centerIn: parent
+                                width: 56; height: 56
+                                radius: 28
+                                z: 10
+                                visible: songCard.hovered
+
+                                gradient: Gradient {
+                                    GradientStop { position: 0.0; color: "#4022D3EE" }
+                                    GradientStop { position: 1.0; color: "#40A78BFA" }
+                                }
+                                border.color: root.accentCyan
+                                border.width: 2
+
+                                opacity: songCard.hovered ? 1 : 0
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    shadowEnabled: true
+                                    shadowColor: root.accentCyan
+                                    shadowBlur: 1.0
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "▶"
+                                    color: "#FFFFFF"
+                                    font.pixelSize: 22
+                                    font.weight: Font.Bold
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                onEntered: songCard.hovered = true
+                                onExited: songCard.hovered = false
+                                onClicked: root.playTrack(index)
+                            }
+                        }
+                    }
+                }
+
+                // Empty state
+                Text {
+                    anchors.centerIn: parent
+                    visible: root.tracks.length === 0
+                    text: "No tracks in this album"
+                    color: root.textMute
+                    font.pixelSize: 14
+                }
+            }
+        }
+    }
+}

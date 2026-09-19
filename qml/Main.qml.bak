@@ -3,7 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import Qt.labs.settings 1.1
-import Void
 
 Window {
     id: root
@@ -35,8 +34,6 @@ Window {
     property string currentPage: "library"
     property var albumList: []
     property var artistList: []
-    property var albumDetail: null
-    property var albumTracks: []
 
     onCurrentPageChanged: {
         if (currentPage === "albums") albumList = buildAlbumList();
@@ -204,7 +201,7 @@ Window {
                             model: 4
                             delegate: Rectangle {
                                 required property int index
-                                                                width: 3
+                                width: 3
                                 radius: 1.5
                                 color: accentCyan
                                 height: 8 + (index % 3) * 5
@@ -411,24 +408,23 @@ Window {
 
                     Repeater {
                         model: [
-                            { name: "Library",   icon: "♫", page: "library" },
-                            { name: "Albums",    icon: "◉", page: "albums" },
-                            { name: "Artists",   icon: "◐", page: "artists" },
-                            { name: "Playlists", icon: "▤", page: "playlists" }
+                            { name: "Library",   icon: "♫" },
+                            { name: "Albums",    icon: "◉" },
+                            { name: "Artists",   icon: "◐" },
+                            { name: "Playlists", icon: "▤" }
                         ]
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
-                            property bool isActive: modelData.page === root.currentPage
                             Layout.fillWidth: true
                             Layout.preferredHeight: 42
                             radius: 10
-                            color: "transparent"
-                            border.color: isActive ? "#6622D3EE" : "transparent"
+                            color: index === 0 ? "transparent" : (navHover.hovered ? greySoft : "transparent")
+                            border.color: index === 0 ? "#6622D3EE" : "transparent"
                             border.width: 1
 
                             Rectangle {
-                                visible: isActive
+                                visible: index === 0
                                 anchors.fill: parent
                                 radius: 10
                                 gradient: Gradient {
@@ -450,8 +446,6 @@ Window {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    root.albumDetail = null;
-                                    root.albumTracks = [];
                                     if (index === 0) { root.currentCategory = ""; root.currentPage = "library"; }
                                     else if (index === 1) root.currentPage = "albums";
                                     else if (index === 2) root.currentPage = "artists";
@@ -467,14 +461,14 @@ Window {
 
                                 Text {
                                     text: modelData.icon
-                                    color: isActive ? "#FFFFFF" : (navHover.hovered ? accentCyan : textDim)
+                                    color: (index === 0 && root.currentCategory === "") ? "#FFFFFF" : (navHover.hovered ? accentCyan : textDim)
                                     font.pixelSize: 16
                                     Layout.alignment: Qt.AlignVCenter
                                 }
 
                                 Text {
                                     text: modelData.name
-                                    color: isActive ? "#FFFFFF" : (navHover.hovered ? textPrimary : textDim)
+                                    color: index === 0 ? "#FFFFFF" : (navHover.hovered ? textPrimary : textDim)
                                     font.pixelSize: 13
                                     font.weight: Font.Medium
                                     Layout.fillWidth: true
@@ -941,15 +935,10 @@ Window {
 
             // ============ ALBUMS PAGE ============
             ColumnLayout {
-                    id: albumsGrid
-                    opacity: root.albumDetail === null ? 1 : 0
-                    scale: root.albumDetail === null ? 1 : 0.94
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                visible: root.currentPage === "albums" && root.albumDetail === null
+                visible: root.currentPage === "albums"
 
                 Rectangle {
                     Layout.fillWidth: true
@@ -1067,64 +1056,7 @@ Window {
                                     font.pixelSize: 10
                                 }
                             }
-                            MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.openAlbum(modelData.album, modelData.artist)
-                        }
-                        }
-                    }
-                }
-            }
-
-            // ============ ALBUM DETAIL (transition view) ============
-            // ============ ALBUM DETAIL (overlay) ============
-            Item {
-                id: albumDetailHost
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: root.currentPage === "albums" && root.albumDetail !== null
-                clip: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    color: "#0A0A14"
-                    opacity: parent.visible ? 0.92 : 0
-                }
-
-                AlbumDetail {
-                    id: albumDetailView
-                    anchors.fill: parent
-                    anchors.margins: 0
-
-                    opacity: (root.currentPage === "albums" && root.albumDetail !== null) ? 1 : 0
-                    scale:   (root.currentPage === "albums" && root.albumDetail !== null) ? 1 : 0.94
-
-                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-
-                    albumName:  root.albumDetail ? root.albumDetail.album : ""
-                    artistName: root.albumDetail ? root.albumDetail.artist : ""
-                    coverUrl:   (root.albumTracks && root.albumTracks.length > 0)
-                                 ? root.albumTracks[0].coverUrl : ""
-                    tracks:     root.albumTracks ? root.albumTracks : []
-
-                    accentCyan:   root.accentCyan
-                    accentPurple: root.accentPurple
-                    accentPink:   root.accentPink
-                    textPrimary:  root.textPrimary
-                    textDim:      root.textDim
-                    textMute:     root.textMute
-                    bgPanel:      root.bgPanel
-                    bgDeep:       root.bgDeep
-
-                    onBack: root.closeAlbum()
-
-                    onOpenNowPlaying: root.showNowPlaying = true
-
-                    onPlayTrack: function(trackIndex) {
-                        if (trackIndex >= 0 && trackIndex < root.albumTracks.length) {
-                            playback.setQueue(library.tracks(), root.albumTracks[trackIndex].index);
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor }
                         }
                     }
                 }
@@ -2656,41 +2588,6 @@ Window {
                 }
             }
         }
-    }
-
-    function openAlbum(albumName, artistName) {
-        var list = [];
-        for (var i = 0; i < trackModel.rowCount(); i++) {
-            var idx = trackModel.index(i, 0);
-            var alb = trackModel.data(idx, 260);
-            var art = trackModel.data(idx, 259);
-            if (alb === albumName && art === artistName) {
-                list.push({
-                    index: i,
-                    title:        trackModel.data(idx, 258),
-                    artist:       art,
-                    album:        alb,
-                    durationText: trackModel.data(idx, 264),
-                    coverUrl:     trackModel.data(idx, 266),
-                    filePath:     trackModel.data(idx, 257),
-                    trackNumber:  trackModel.data(idx, 268)
-                });
-            }
-        }
-        list.sort(function(a, b) {
-            return (a.trackNumber || 0) - (b.trackNumber || 0);
-        });
-        root.albumTracks = list;
-        root.albumDetail = { album: albumName, artist: artistName };
-        console.log("VOID: openAlbum:", albumName, "→", list.length, "tracks");
-        for (var d = 0; d < Math.min(list.length, 3); d++) {
-            console.log("  [" + d + "]", list[d].title, "cover:", list[d].coverUrl);
-        }
-    }
-
-    function closeAlbum() {
-        root.albumDetail = null;
-        root.albumTracks = [];
     }
 
     function countInCategory(categoryName) {

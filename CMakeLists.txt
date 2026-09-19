@@ -43,6 +43,7 @@ qt_add_qml_module(void
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        qml/components/AlbumDetail.qml
     RESOURCES
     qml/theme/Theme.qml
         qml/assets/icons/disc.svg
