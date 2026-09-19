@@ -1,5 +1,6 @@
 #include "player/Playback.h"
 #include <QDebug>
+#include <QAudioBufferOutput>
 
 Playback::Playback(QObject* parent)
     : QObject(parent)
@@ -8,6 +9,12 @@ Playback::Playback(QObject* parent)
 {
     m_player->setAudioOutput(m_audio);
     m_audio->setVolume(m_volume / 100.0);
+
+    m_analyzer = new AudioAnalyzer(this);
+    auto* bufOut = new QAudioBufferOutput(this);
+    m_player->setAudioBufferOutput(bufOut);
+    connect(bufOut, &QAudioBufferOutput::audioBufferReceived,
+            m_analyzer, &AudioAnalyzer::processBuffer);
 
     connect(m_player, &QMediaPlayer::playingChanged, this, [this]() {
         const bool isPlaying = (m_player->playbackState() == QMediaPlayer::PlayingState);

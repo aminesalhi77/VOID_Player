@@ -23,11 +23,15 @@ qt_add_executable(void
     src/library/Track.h
     src/library/Library.h
     src/library/Library.cpp
+    src/library/LibraryDb.h
+    src/library/LibraryDb.cpp
     src/metadata/TagReader.h
     src/metadata/TagReader.cpp
     src/models/TrackModel.h
     src/models/TrackModel.cpp
     src/player/Playback.h
+    src/player/AudioAnalyzer.h
+    src/player/AudioAnalyzer.cpp
     src/player/Playback.cpp
 )
 # Register Theme.qml as a QML singleton

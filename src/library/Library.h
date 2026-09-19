@@ -5,6 +5,7 @@
 #include <QString>
 #include <QSet>
 #include "library/Track.h"
+#include "library/LibraryDb.h"
 
 class Library : public QObject {
     Q_OBJECT
@@ -22,6 +23,7 @@ public:
     Q_INVOKABLE int count() const { return m_tracks.size(); }
     Q_INVOKABLE void pickFolderAndScan();
     Q_INVOKABLE void scanDefaultMusicFolder();
+    Q_INVOKABLE void loadFromDb();
 
     bool scanning() const { return m_scanning; }
     int scanCurrent() const { return m_scanCurrent; }
@@ -38,7 +40,8 @@ signals:
 
 private:
     QList<Track> m_tracks;
-    QSet<QString> m_seenPaths;    // ← NEW — prevents duplicates
+    QSet<QString> m_seenPaths;
+    LibraryDb m_db;    // ← NEW — prevents duplicates
     bool m_scanning = false;
     int m_scanCurrent = 0;
     int m_scanTotal = 0;

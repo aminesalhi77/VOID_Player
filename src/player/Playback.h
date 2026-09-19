@@ -6,6 +6,7 @@
 #include <QUrl>
 #include <QList>
 #include "library/Track.h"
+#include "player/AudioAnalyzer.h"
 
 class Playback : public QObject {
     Q_OBJECT
@@ -19,6 +20,7 @@ class Playback : public QObject {
     Q_PROPERTY(QString album READ album NOTIFY trackChanged)
     Q_PROPERTY(QString coverUrl READ coverUrl NOTIFY trackChanged)
     Q_PROPERTY(int currentIndex READ currentIndex NOTIFY trackChanged)
+    Q_PROPERTY(AudioAnalyzer* analyzer READ analyzer CONSTANT)
 
 public:
     explicit Playback(QObject* parent = nullptr);
@@ -32,6 +34,7 @@ public:
     QString album() const { return m_current.album; }
     QString coverUrl() const;
     int currentIndex() const { return m_currentIndex; }
+    AudioAnalyzer* analyzer() const { return m_analyzer; }
 
     Q_INVOKABLE void setQueue(const QList<Track>& tracks, int startIndex);
     Q_INVOKABLE void playPause();
@@ -60,4 +63,5 @@ private:
     int m_currentIndex = -1;
     bool m_playing = false;
     int m_volume = 70;
+    AudioAnalyzer* m_analyzer = nullptr;
 };

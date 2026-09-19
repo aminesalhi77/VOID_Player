@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <!-- Vortex gradient: cyan → purple → magenta -->
+    <radialGradient id="vortexGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#05060D" stop-opacity="1"/>
+      <stop offset="35%"  stop-color="#22D3EE" stop-opacity="0.95"/>
+      <stop offset="65%"  stop-color="#A78BFA" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#E879F9" stop-opacity="0.35"/>
+    </radialGradient>
+
+    <!-- Text gradient -->
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#22D3EE"/>
+      <stop offset="50%"  stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#E879F9"/>
+    </linearGradient>
+
+    <!-- Soft outer glow -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Outer aura -->
+    <filter id="aura" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- ===== VORTEX MARK ===== -->
+  <g transform="translate(60, 60)">
+
+    <!-- Outer aura glow -->
+    <circle cx="0" cy="0" r="42"
+            fill="none"
+            stroke="#A78BFA"
+            stroke-width="6"
+            opacity="0.35"
+            filter="url(#aura)"/>
+
+    <!-- Spiral arms (4 arms, rotated) -->
+    <g filter="url(#softGlow)">
+      <path d="M 0 0
+               C 5 -15, 20 -25, 32 -22
+               C 22 -15, 15 -5, 12 5
+               C 8 14, 0 22, -8 24
+               C -3 16, -2 8, 0 0 Z"
+            fill="#22D3EE"
+            opacity="0.9"
+            transform="rotate(0)"/>
+
+      <path d="M 0 0
+               C 5 -15, 20 -25, 32 -22
+               C 22 -15, 15 -5, 12 5
+               C 8 14, 0 22, -8 24
+               C -3 16, -2 8, 0 0 Z"
+            fill="#A78BFA"
+            opacity="0.85"
+            transform="rotate(90)"/>
+
+      <path d="M 0 0
+               C 5 -15, 20 -25, 32 -22
+               C 22 -15, 15 -5, 12 5
+               C 8 14, 0 22, -8 24
+               C -3 16, -2 8, 0 0 Z"
+            fill="#22D3EE"
+            opacity="0.75"
+            transform="rotate(180)"/>
+
+      <path d="M 0 0
+               C 5 -15, 20 -25, 32 -22
+               C 22 -15, 15 -5, 12 5
+               C 8 14, 0 22, -8 24
+               C -3 16, -2 8, 0 0 Z"
+            fill="#E879F9"
+            opacity="0.8"
+            transform="rotate(270)"/>
+    </g>
+
+    <!-- Swirl ring (the "event horizon") -->
+    <circle cx="0" cy="0" r="26"
+            fill="none"
+            stroke="url(#vortexGrad)"
+            stroke-width="1.5"
+            opacity="0.9"/>
+
+    <circle cx="0" cy="0" r="18"
+            fill="none"
+            stroke="#22D3EE"
+            stroke-width="0.8"
+            opacity="0.6"/>
+
+    <!-- Center singularity (dark core) -->
+    <circle cx="0" cy="0" r="6" fill="#05060D"/>
+    <circle cx="0" cy="0" r="4"
+            fill="none"
+            stroke="#22D3EE"
+            stroke-width="1"
+            opacity="0.9"
+            filter="url(#softGlow)"/>
+  </g>
+
+  <!-- ===== VOID TEXT ===== -->
+  <text x="130" y="78"
+        font-family="Inter, 'Segoe UI', system-ui, sans-serif"
+        font-size="56"
+        font-weight="900"
+        letter-spacing="14"
+        fill="url(#textGrad)"
+        filter="url(#softGlow)">VOID</text>
+
+  <!-- Subtle underline accent -->
+  <line x1="130" y1="94" x2="330" y2="94"
+        stroke="url(#textGrad)"
+        stroke-width="2"
+        stroke-linecap="round"
+        opacity="0.6"/>
+</svg>

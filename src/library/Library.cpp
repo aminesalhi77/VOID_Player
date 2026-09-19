@@ -9,13 +9,39 @@
 #include <QCoreApplication>
 #include <QUrl>
 #include <QDir>
+#include <QSqlDatabase>
+#include <QSqlError>
 
-Library::Library(QObject* parent) : QObject(parent) {}
+Library::Library(QObject* parent) : QObject(parent) {
+    // Open (or create) the SQLite library database
+    const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dataDir);
+    const QString dbPath = dataDir + "/library.db";
+    if (m_db.open(dbPath)) {
+        qDebug() << "VOID: DB opened at" << dbPath;
+    } else {
+        qWarning() << "VOID: failed to open DB — persistence disabled";
+    }
+}
 
 void Library::clear() {
     m_tracks.clear();
     m_seenPaths.clear();
+    m_db.clear();
     emit tracksChanged();
+}
+
+void Library::loadFromDb() {
+    if (m_db.count() == 0) {
+        qDebug() << "VOID: DB is empty, nothing to load";
+        return;
+    }
+    m_tracks = m_db.loadAll();
+    for (const Track& t : m_tracks) {
+        m_seenPaths.insert(t.filePath);
+    }
+    emit tracksChanged();
+    qDebug() << "VOID: loaded" << m_tracks.size() << "tracks from DB";
 }
 
 void Library::scanFolder(const QString& folderPath) {
@@ -69,6 +95,7 @@ void Library::scanFolder(const QString& folderPath) {
             if (t.isValid()) {
                 m_tracks.append(t);
                 m_seenPaths.insert(path);
+                m_db.upsert(t);      // persist to SQLite
                 ++added;
             }
         }
@@ -81,11 +108,27 @@ void Library::scanFolder(const QString& folderPath) {
         }
     }
 
+    // Prune tracks whose files no longer exist
+    QList<Track> keep;
+    int pruned = 0;
+    for (const Track& t : m_tracks) {
+        if (QFileInfo::exists(t.filePath)) {
+            keep.append(t);
+        } else {
+            m_db.remove(t.filePath);
+            m_seenPaths.remove(t.filePath);
+            ++pruned;
+        }
+    }
+    m_tracks = keep;
+
     m_scanning = false;
     emit scanningChanged();
     emit tracksChanged();
     emit scanFinished(m_scanTotal);
-    qDebug() << "VOID: scan done —" << added << "added," << skipped << "skipped (already in library)";
+    qDebug() << "VOID: scan done —" << added << "added,"
+             << skipped << "skipped,"
+             << pruned << "pruned";
 }
 
 void Library::pickFolderAndScan() {

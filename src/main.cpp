@@ -10,12 +10,19 @@
 #include "library/Library.h"
 #include "models/TrackModel.h"
 #include "player/Playback.h"
+#include <QAudioBuffer>
 
 int main(int argc, char *argv[])
 {
     qputenv("QT_QPA_PLATFORMTHEME", "qt5ct");
     qputenv("QT_STYLE_OVERRIDE", "Fusion");
     qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
+
+    // Register QAudioBuffer so QAudioBufferOutput signals reach AudioAnalyzer
+    qRegisterMetaType<QAudioBuffer>("QAudioBuffer");
+
+    // Force GStreamer backend — FFmpeg backend lacks QAudioBufferOutput support
+    qputenv("QT_MEDIA_BACKEND", "gstreamer");
 
     QApplication app(argc, argv);
     app.setApplicationName("VOID");

@@ -31,6 +31,14 @@ Window {
     property string searchText: ""
     property int lastClickedIndex: -1
     property string currentCategory: ""
+    property string currentPage: "library"
+    property var albumList: []
+    property var artistList: []
+
+    onCurrentPageChanged: {
+        if (currentPage === "albums") albumList = buildAlbumList();
+        else if (currentPage === "artists") artistList = buildArtistList();
+    }
 
     // Category store: filePath -> categoryName
     property var trackCategories: ({})
@@ -96,6 +104,30 @@ Window {
         property alias visualizerMode: root.visualizerMode
     }
     property string visualizerMode: "bars"
+    property real vizTick: 0
+
+    // Single global animation driving every bar
+    NumberAnimation on vizTick {
+        running: playback.playing
+        loops: Animation.Infinite
+        from: 0
+        to: 6283
+        duration: 9000
+        easing.type: Easing.Linear
+    }
+
+    // Auto-load from DB, then auto-scan only if empty
+    Component.onCompleted: {
+        // 1. Load previously saved library from SQLite (instant)
+        library.loadFromDb();
+
+        // 2. Only auto-scan if the DB was empty
+        if (library.count() === 0 && !hasAutoScanned) {
+            hasAutoScanned = true;
+            console.log("VOID: empty library — auto-scanning ~/Music...");
+            library.scanDefaultMusicFolder();
+        }
+    }
 
     // ============ BACKGROUND ============
     Image {
@@ -406,7 +438,10 @@ Window {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (index === 0) root.currentCategory = "";
+                                    if (index === 0) { root.currentCategory = ""; root.currentPage = "library"; }
+                                    else if (index === 1) root.currentPage = "albums";
+                                    else if (index === 2) root.currentPage = "artists";
+                                    else if (index === 3) root.currentPage = "playlists";
                                 }
                             }
 
@@ -520,7 +555,8 @@ Window {
                     Item { Layout.fillHeight: true }
 
                     Text {
-                        text: "VOID  v1.0.0"
+                        text: "Made by Amine SALHI
+    VOID  v1.0.0"
                         color: "#2E2E3A"
                         font.pixelSize: 10
                         font.letterSpacing: 1
@@ -531,6 +567,7 @@ Window {
 
             // ============ LIBRARY CONTENT ============
             ColumnLayout {
+                visible: root.currentPage === "library"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
@@ -886,6 +923,375 @@ Window {
                     }
                 }
             }
+
+
+            // ============ ALBUMS PAGE ============
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
+                visible: root.currentPage === "albums"
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 90
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 28
+                        anchors.rightMargin: 28
+                        spacing: 14
+                        Rectangle {
+                            width: 3; height: 44
+                            Layout.alignment: Qt.AlignVCenter
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: accentCyan }
+                                GradientStop { position: 1.0; color: accentPurple }
+                            }
+                        }
+                        ColumnLayout {
+                            spacing: 2
+                            Text { text: "Albums"; color: textPrimary; font.pixelSize: 26; font.weight: Font.Bold }
+                            Text { text: root.albumList.length + " albums"; color: textDim; font.pixelSize: 12 }
+                        }
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+
+                GridView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 28
+                    Layout.rightMargin: 28
+                    Layout.topMargin: 12
+                    Layout.bottomMargin: 24
+                    clip: true
+                    cellWidth: 200
+                    cellHeight: 256
+                    model: root.albumList
+                    delegate: Item {
+                        required property var modelData
+                        width: 200
+                        height: 256
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 184
+                            height: 240
+                            radius: 14
+                            color: "#1A1A28"
+                            border.width: 2
+                            border.color: "#22D3EE"
+
+                            SequentialAnimation on border.color {
+                                running: true
+                                loops: Animation.Infinite
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
+                                ColorAnimation { to: "#E879F9"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 6
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 138
+                                    radius: 10
+                                    color: bgPanel
+                                    clip: true
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.coverUrl
+                                        fillMode: Image.PreserveAspectCrop
+                                        visible: modelData.coverUrl !== ""
+                                        asynchronous: true
+                                    }
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        visible: modelData.coverUrl === ""
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: cyanLine }
+                                            GradientStop { position: 1.0; color: purpleLine }
+                                        }
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "♪"
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 40
+                                        visible: modelData.coverUrl === ""
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.album
+                                    color: textPrimary
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.artist
+                                    color: textDim
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.count + " track" + (modelData.count === 1 ? "" : "s")
+                                    color: textMute
+                                    font.pixelSize: 10
+                                }
+                            }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor }
+                        }
+                    }
+                }
+            }
+
+            // ============ ARTISTS PAGE ============
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
+                visible: root.currentPage === "artists"
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 90
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 28
+                        anchors.rightMargin: 28
+                        spacing: 14
+                        Rectangle {
+                            width: 3; height: 44
+                            Layout.alignment: Qt.AlignVCenter
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: accentCyan }
+                                GradientStop { position: 1.0; color: accentPurple }
+                            }
+                        }
+                        ColumnLayout {
+                            spacing: 2
+                            Text { text: "Artists"; color: textPrimary; font.pixelSize: 26; font.weight: Font.Bold }
+                            Text { text: root.artistList.length + " artists"; color: textDim; font.pixelSize: 12 }
+                        }
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+
+                GridView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 28
+                    Layout.rightMargin: 28
+                    Layout.topMargin: 12
+                    Layout.bottomMargin: 24
+                    clip: true
+                    cellWidth: 200
+                    cellHeight: 230
+                    model: root.artistList
+                    delegate: Item {
+                        required property var modelData
+                        width: 200
+                        height: 230
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 184
+                            height: 214
+                            radius: 14
+                            color: "#1A1A28"
+                            border.width: 2
+                            border.color: "#22D3EE"
+
+                            SequentialAnimation on border.color {
+                                running: true
+                                loops: Animation.Infinite
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
+                                ColorAnimation { to: "#E879F9"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 10
+
+                                Item {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 116
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 96; height: 96
+                                        radius: 48
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: cyanLine }
+                                            GradientStop { position: 1.0; color: purpleLine }
+                                        }
+                                        border.color: accentCyan
+                                        border.width: 1
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.name.charAt(0).toUpperCase()
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 40
+                                        font.weight: Font.Bold
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.name
+                                    color: textPrimary
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.count + " track" + (modelData.count === 1 ? "" : "s")
+                                    color: textMute
+                                    font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor }
+                        }
+                    }
+                }
+            }
+
+            // ============ PLAYLISTS PAGE ============
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
+                visible: root.currentPage === "playlists"
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 90
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 28
+                        anchors.rightMargin: 28
+                        spacing: 14
+                        Rectangle {
+                            width: 3; height: 44
+                            Layout.alignment: Qt.AlignVCenter
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: accentCyan }
+                                GradientStop { position: 1.0; color: accentPurple }
+                            }
+                        }
+                        ColumnLayout {
+                            spacing: 2
+                            Text { text: "Playlists"; color: textPrimary; font.pixelSize: 26; font.weight: Font.Bold }
+                            Text { text: root.categoryList.length + " playlists"; color: textDim; font.pixelSize: 12 }
+                        }
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+
+                GridView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 28
+                    Layout.rightMargin: 28
+                    Layout.topMargin: 12
+                    Layout.bottomMargin: 24
+                    clip: true
+                    cellWidth: 200
+                    cellHeight: 190
+                    model: root.categoryList
+                    delegate: Item {
+                        required property var modelData
+                        width: 200
+                        height: 190
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 184
+                            height: 174
+                            radius: 14
+                            color: "#1A1A28"
+                            border.width: 2
+                            border.color: "#22D3EE"
+
+                            SequentialAnimation on border.color {
+                                running: true
+                                loops: Animation.Infinite
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
+                                ColorAnimation { to: "#E879F9"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 8
+
+                                Item {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 90
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 70; height: 70
+                                        radius: 35
+                                        color: modelData.color + "33"
+                                        border.color: modelData.color
+                                        border.width: 2
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.name.charAt(0).toUpperCase()
+                                        color: modelData.color
+                                        font.pixelSize: 32
+                                        font.weight: Font.Bold
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.name
+                                    color: textPrimary
+                                    font.pixelSize: 14
+                                    font.weight: Font.Bold
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: root.countInCategory(modelData.name) + " track" + (root.countInCategory(modelData.name) === 1 ? "" : "s")
+                                    color: textMute
+                                    font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.currentPage = "library";
+                                    root.currentCategory = modelData.name;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
         }
 
         // =================================================================
@@ -1184,50 +1590,115 @@ Window {
                         Layout.preferredHeight: 86
                         Layout.alignment: Qt.AlignVCenter
 
+                        Item {
+                            id: bottomBarInner
+                            anchors.fill: parent
+                            anchors.margins: 4
+
+                            Repeater {
+                                model: 20
+                                delegate: Item {
+                                    required property int index
+
+                                    property real barW: (bottomBarInner.width - 19 * 3) / 20
+                                    x: index * (barW + 3)
+                                    y: 0
+                                    width: barW
+                                    height: bottomBarInner.height
+
+                                    property real energy: {
+                                        var amps = playback.analyzer ? playback.analyzer.amplitudes : null;
+                                        if (!amps || amps.length === 0) return 0;
+                                        var i = Math.min(Math.floor(index * (amps.length / 20)), amps.length - 1);
+                                        return amps[i] || 0;
+                                    }
+
+                                    property real displayH: Math.max(3,
+                                        bottomBarInner.height * Math.min(1.0, energy * 1.0))
+
+                                    // Neon palette: cyan → purple → magenta
+                                    property real baseHue: 180 + (index / 19.0) * 130
+                                    property real hueOffset: 0
+                                    NumberAnimation on hueOffset {
+                                        running: true
+                                        loops: Animation.Infinite
+                                        from: -10
+                                        to: 10
+                                        duration: 2800 + (index % 6) * 200
+                                    }
+                                    property real finalHue: baseHue + hueOffset
+
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: parent.width
+                                        height: parent.displayH
+                                        radius: 1.5
+
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: Qt.hsla(finalHue / 360, 0.85, 0.6, 1.0)
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: Qt.hsla(((finalHue + 40) % 360) / 360, 0.85, 0.5, 1.0)
+                                            }
+                                        }
+
+                                        Behavior on height {
+                                            NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
+                                        }
+
+                                        layer.enabled: true
+                            layer.effect: MultiEffect {
+                                            shadowEnabled: true
+                                            shadowColor: Qt.hsla(finalHue / 360, 0.9, 0.6, 1.0)
+                                            shadowBlur: 0.5
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Row {
                             anchors.centerIn: parent
                             spacing: 3
+                            visible: false
 
                             Repeater {
-                                model: 24
+                                model: 16
                                 delegate: Item {
                                     required property int index
-                                    width: 4
-                                    height: 86
 
-                                    property real baseH: 4 + (index % 5) * 3
-                                    property real maxH:  30 + (index % 7) * 6
-                                    property int  dur:   280 + (index % 5) * 80
+                                    // Manual positioning — no Row, no circular sizing
+                                    property real barW: (parent.width - 15 * 3) / 16
+                                    x: index * (barW + 3)
+                                    width: barW
+                                    height: parent.height
+
+                                    property real baseH: 0.15 + ((index * 7) % 5) * 0.06
+                                    property real amp:   0.35 + ((index * 11) % 4) * 0.12
+                                    property real speed: 0.7 + ((index * 13) % 5) * 0.25
+                                    property real phase: (index * 0.83) % 6.283
+
+                                    // Pure function of vizTick — always animates
+                                    property real energy: 0.5 + 0.5 * Math.sin(root.vizTick * 0.01 * speed + phase)
+                                    property real barH: parent.height * (baseH + amp * energy)
+                                    property real baseHue: 180 + (index / 15.0) * 130
 
                                     Rectangle {
                                         anchors.bottom: parent.bottom
                                         width: parent.width
-                                        height: baseH
+                                        height: parent.barH
                                         radius: 2
-                                        gradient: Gradient {
-                                            GradientStop { position: 0.0; color: accentPurple }
-                                            GradientStop { position: 1.0; color: accentCyan }
-                                        }
+                                        color: Qt.hsla(parent.baseHue / 360, 0.85, 0.6, 1.0)
+
                                         layer.enabled: true
                                         layer.effect: MultiEffect {
                                             shadowEnabled: true
-                                            shadowColor: accentCyan
-                                            shadowBlur: 0.6
-                                        }
-
-                                        SequentialAnimation on height {
-                                            running: playback.playing
-                                            loops: Animation.Infinite
-                                            NumberAnimation {
-                                                to: maxH
-                                                duration: dur
-                                                easing.type: Easing.InOutSine
-                                            }
-                                            NumberAnimation {
-                                                to: baseH
-                                                duration: dur + 100
-                                                easing.type: Easing.InOutSine
-                                            }
+                                            shadowColor: Qt.hsla(parent.baseHue / 360, 0.9, 0.6, 1.0)
+                                            shadowBlur: 0.5
                                         }
                                     }
                                 }
@@ -1529,21 +2000,115 @@ Window {
                     anchors.fill: parent
                     visible: visualizerMode === "disc"
 
-                    Rectangle {
+                    // Outer ring — pulses with average bass energy
+                    // Ripple ring 1 — expanding wave, resets on each kick
+                    // ========== WAVY RING (undulating outline) ==========
+                    Canvas {
+                        id: wavyRing
                         anchors.centerIn: parent
-                        width: 320; height: 320
-                        radius: 160
-                        color: "transparent"
-                        border.color: accentCyan
-                        border.width: 2
-                        opacity: playback.playing ? 0.9 : 0.3
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            shadowEnabled: true
-                            shadowColor: accentCyan
-                            shadowBlur: 1.0
+                        width: 460
+                        height: 460
+                        antialiasing: true
+
+                        renderTarget: Canvas.FramebufferObject
+                        renderStrategy: Canvas.Cooperative
+
+                        property real phase: 0
+
+                        // Real-time audio energy — bass + overall
+                        property real bassEnergy: {
+                            var a = playback.analyzer ? playback.analyzer.amplitudes : null;
+                            if (!a || a.length === 0) return 0;
+                            var s = 0;
+                            for (var i = 0; i < 8 && i < a.length; i++) s += a[i];
+                            return s / 8;
                         }
-                        Behavior on opacity { NumberAnimation { duration: 400 } }
+
+                        property real peakEnergy: playback.analyzer ? playback.analyzer.peakEnergy : 0
+
+                        // Smoothly follow the bass — attack fast, release slow
+                        property real drive: 0
+                        onBassEnergyChanged: {
+                            if (bassEnergy > drive) drive = bassEnergy;      // instant attack
+                            else drive = drive * 0.85 + bassEnergy * 0.15;   // smooth release
+                        }
+
+                        Timer {
+                            interval: 16
+                            running: playback.playing
+                            repeat: true
+                            onTriggered: {
+                                wavyRing.phase += 0.15;
+                                wavyRing.requestPaint();
+                            }
+                        }
+
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+
+                            var cx = width / 2;
+                            var cy = height / 2;
+
+                            // Base radius pulses with bass — 138 (quiet) to 175 (loud)
+                            var baseR = 138 + drive * 40;
+
+                            // Wave amplitude scales with energy too
+                            var waveAmp = 8 + drive * 30;
+
+                            var steps = 72;
+
+                            // ---- Outer magenta halo ----
+                            ctx.beginPath();
+                            ctx.lineWidth = 2 + drive * 3;
+                            ctx.strokeStyle = "rgba(232, 121, 249, " + (0.35 + drive * 0.65) + ")";
+                            for (var k = 0; k <= steps; k++) {
+                                var a3 = (k / steps) * Math.PI * 2;
+                                var r3 = baseR + 18
+                                       + Math.sin(a3 * 3 + phase * 0.9) * waveAmp * 0.7
+                                       + Math.sin(a3 * 6 - phase * 1.3) * waveAmp * 0.4;
+                                var x3 = cx + Math.cos(a3) * r3;
+                                var y3 = cy + Math.sin(a3) * r3;
+                                if (k === 0) ctx.moveTo(x3, y3);
+                                else ctx.lineTo(x3, y3);
+                            }
+                            ctx.closePath();
+                            ctx.stroke();
+
+                            // ---- Cyan main wave ----
+                            ctx.beginPath();
+                            ctx.lineWidth = 3 + drive * 2;
+                            ctx.strokeStyle = "rgba(34, 211, 238, " + (0.55 + drive * 0.45) + ")";
+                            for (var i = 0; i <= steps; i++) {
+                                var a = (i / steps) * Math.PI * 2;
+                                var r = baseR
+                                      + Math.sin(a * 4 + phase * 1.2) * waveAmp
+                                      + Math.sin(a * 7 - phase * 1.6) * waveAmp * 0.5;
+                                var x = cx + Math.cos(a) * r;
+                                var y = cy + Math.sin(a) * r;
+                                if (i === 0) ctx.moveTo(x, y);
+                                else ctx.lineTo(x, y);
+                            }
+                            ctx.closePath();
+                            ctx.stroke();
+
+                            // ---- Purple inner ripple ----
+                            ctx.beginPath();
+                            ctx.lineWidth = 2 + drive;
+                            ctx.strokeStyle = "rgba(167, 139, 250, " + (0.5 + drive * 0.5) + ")";
+                            for (var j = 0; j <= steps; j++) {
+                                var a2 = (j / steps) * Math.PI * 2;
+                                var r2 = baseR - 14
+                                       + Math.sin(a2 * 5 - phase * 1.4) * waveAmp * 0.6
+                                       + Math.sin(a2 * 9 + phase * 1.9) * waveAmp * 0.35;
+                                var x2 = cx + Math.cos(a2) * r2;
+                                var y2 = cy + Math.sin(a2) * r2;
+                                if (j === 0) ctx.moveTo(x2, y2);
+                                else ctx.lineTo(x2, y2);
+                            }
+                            ctx.closePath();
+                            ctx.stroke();
+                        }
                     }
 
                     Rectangle {
@@ -1554,6 +2119,17 @@ Window {
                         color: "#0B0B14"
                         border.color: "#1E1E2A"
                         border.width: 1
+
+                        // Subtle pulse with bass
+                        property real bassPulse: {
+                            var a = playback.analyzer ? playback.analyzer.amplitudes : null;
+                            if (!a || a.length === 0) return 0;
+                            var s = 0;
+                            for (var i = 0; i < 8 && i < a.length; i++) s += a[i];
+                            return s / 8;
+                        }
+                        scale: playback.playing ? (1.0 + bassPulse * 0.06) : 1.0
+                        Behavior on scale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
 
                         Repeater {
                             model: 6
@@ -1636,61 +2212,77 @@ Window {
                     anchors.fill: parent
                     visible: visualizerMode === "bars"
 
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: parent.width * 0.9
-                        height: parent.height * 0.5
-                        radius: 20
-                        color: accentCyan
-                        opacity: playback.playing ? 0.08 : 0.03
-                        layer.enabled: true
-                        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0 }
-                    }
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
+                    // The bar area (inset from edges)
+                    Item {
+                        id: barsInner
+                        anchors.fill: parent
+                        anchors.leftMargin: 30
+                        anchors.rightMargin: 30
+                        anchors.topMargin: 60
+                        anchors.bottomMargin: 60
 
                         Repeater {
-                            model: 32
+                            model: 48
                             delegate: Item {
                                 required property int index
-                                width: 6
-                                height: barsContainer.height
 
-                                property real baseH: 0.15 + (index % 5) * 0.08
-                                property real amp:   0.25 + (index % 3) * 0.15
-                                property int  dur:   280 + (index % 7) * 60
+                                property real barW: (barsInner.width - 47 * 3) / 48
+                                x: index * (barW + 3)
+                                y: 0
+                                width: barW
+                                height: barsInner.height
+
+                                // Raw FFT energy for this bar
+                                property real energy: {
+                                    var amps = playback.analyzer ? playback.analyzer.amplitudes : null;
+                                    if (!amps || amps.length === 0) return 0;
+                                    var i = Math.min(Math.floor(index * (amps.length / 48)), amps.length - 1);
+                                    return amps[i] || 0;
+                                }
+
+                                // Amplify so bars actually move
+                                property real displayH: Math.max(3,
+                                    barsInner.height * Math.min(1.0, energy * 1.0))
+
+                                // Neon palette: cyan → purple → magenta across width
+                                property real baseHue: 180 + (index / 47.0) * 130
+                                property real hueOffset: 0
+                                NumberAnimation on hueOffset {
+                                    running: true
+                                    loops: Animation.Infinite
+                                    from: -10
+                                    to: 10
+                                    duration: 3000 + (index % 8) * 200
+                                }
+                                property real finalHue: baseHue + hueOffset
 
                                 Rectangle {
                                     anchors.bottom: parent.bottom
+                                    anchors.horizontalCenter: parent.horizontalCenter
                                     width: parent.width
-                                    height: parent.height * baseH
-                                    radius: 3
+                                    height: parent.displayH
+                                    radius: 2
+
                                     gradient: Gradient {
-                                        GradientStop { position: 0.0; color: accentPurple }
-                                        GradientStop { position: 1.0; color: accentCyan }
+                                        GradientStop {
+                                            position: 0.0
+                                            color: Qt.hsla(finalHue / 360, 0.85, 0.62, 1.0)
+                                        }
+                                        GradientStop {
+                                            position: 1.0
+                                            color: Qt.hsla(((finalHue + 40) % 360) / 360, 0.85, 0.5, 1.0)
+                                        }
                                     }
+
+                                    Behavior on height {
+                                        NumberAnimation { duration: 90; easing.type: Easing.OutQuad }
+                                    }
+
                                     layer.enabled: true
                                     layer.effect: MultiEffect {
                                         shadowEnabled: true
-                                        shadowColor: accentCyan
+                                        shadowColor: Qt.hsla(finalHue / 360, 0.9, 0.6, 1.0)
                                         shadowBlur: 0.7
-                                    }
-
-                                    SequentialAnimation on height {
-                                        running: playback.playing
-                                        loops: Animation.Infinite
-                                        NumberAnimation {
-                                            to: barsContainer.height * (baseH + amp)
-                                            duration: dur
-                                            easing.type: Easing.InOutSine
-                                        }
-                                        NumberAnimation {
-                                            to: barsContainer.height * baseH
-                                            duration: dur + 80
-                                            easing.type: Easing.InOutSine
-                                        }
                                     }
                                 }
                             }
@@ -1996,6 +2588,47 @@ Window {
             if (hasCategory(path, categoryName)) count++;
         }
         return count;
+    }
+
+    function buildAlbumList() {
+        var groups = {};
+        for (var i = 0; i < trackModel.rowCount(); i++) {
+            var idx = trackModel.index(i, 0);
+            var albumName  = trackModel.data(idx, 260);
+            var artistName = trackModel.data(idx, 259);
+            var coverUrl   = trackModel.data(idx, 266);
+            if (!albumName) albumName = "Unknown Album";
+            if (!artistName) artistName = "Unknown Artist";
+            var key = albumName + "||" + artistName;
+            if (groups[key] === undefined) {
+                groups[key] = {
+                    album: albumName,
+                    artist: artistName,
+                    coverUrl: coverUrl || "",
+                    count: 0
+                };
+            }
+            groups[key].count++;
+        }
+        var list = [];
+        for (var k in groups) list.push(groups[k]);
+        return list;
+    }
+
+    function buildArtistList() {
+        var groups = {};
+        for (var i = 0; i < trackModel.rowCount(); i++) {
+            var idx = trackModel.index(i, 0);
+            var artistName = trackModel.data(idx, 259);
+            if (!artistName) artistName = "Unknown Artist";
+            if (groups[artistName] === undefined) {
+                groups[artistName] = { name: artistName, count: 0, coverUrl: "" };
+            }
+            groups[artistName].count++;
+        }
+        var list = [];
+        for (var k in groups) list.push(groups[k]);
+        return list;
     }
 
     function fmt(ms) {
