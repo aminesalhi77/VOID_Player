@@ -65,5 +65,10 @@ int main(int argc, char *argv[])
 
     engine.loadFromModule("Void", "Main");
 
+    // Save playback state when app is about to quit
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &playback, [&playback]() {
+        // Playback saves its own state
+    });
+
     return app.exec();
 }

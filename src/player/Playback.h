@@ -4,6 +4,8 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QUrl>
+#include <QTimer>
+#include <QSettings>
 #include <QList>
 #include "library/Track.h"
 #include "player/AudioAnalyzer.h"
@@ -44,6 +46,8 @@ public:
     Q_INVOKABLE void seek(qint64 ms);
     Q_INVOKABLE void skipForward10();
     Q_INVOKABLE void skipBackward10();
+    Q_INVOKABLE void restoreLastSession();
+    Q_INVOKABLE void loadQueueOnly(const QList<Track>& tracks);
 
 public slots:
     void setVolume(int v);
@@ -64,4 +68,5 @@ private:
     bool m_playing = false;
     int m_volume = 70;
     AudioAnalyzer* m_analyzer = nullptr;
+    QTimer* m_saveTimer = nullptr;
 };

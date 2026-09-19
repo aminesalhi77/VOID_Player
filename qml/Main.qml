@@ -102,6 +102,8 @@ Window {
         id: prefs
         category: "void"
         property alias visualizerMode: root.visualizerMode
+        property alias currentPage: root.currentPage
+        property alias currentCategory: root.currentCategory
     }
     property string visualizerMode: "bars"
     property real vizTick: 0
@@ -127,6 +129,12 @@ Window {
             console.log("VOID: empty library — auto-scanning ~/Music...");
             library.scanDefaultMusicFolder();
         }
+
+        // 3. Load the queue (without auto-playing) and restore last session
+        Qt.callLater(function() {
+            playback.loadQueueOnly(library.tracks());
+            playback.restoreLastSession();
+        });
     }
 
     // ============ BACKGROUND ============
