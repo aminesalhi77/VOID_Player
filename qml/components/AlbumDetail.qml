@@ -164,10 +164,10 @@ Item {
                         SequentialAnimation on border.color {
                             running: true
                             loops: Animation.Infinite
-                            ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                            ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                            ColorAnimation { to: "#E879F9"; duration: 1400 }
-                            ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                            ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                            ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                            ColorAnimation { to: "#E879F9"; duration: 2600 }
+                            ColorAnimation { to: "#22D3EE"; duration: 2600 }
                         }
 
                         layer.enabled: true
@@ -273,10 +273,10 @@ Item {
                             SequentialAnimation on border.color {
                                 running: true
                                 loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                                ColorAnimation { to: "#E879F9"; duration: 1400 }
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                                ColorAnimation { to: "#E879F9"; duration: 2600 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
                             }
 
                             layer.enabled: hovered
@@ -446,10 +446,10 @@ Item {
                             SequentialAnimation on border.color {
                                 running: true
                                 loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                                ColorAnimation { to: "#E879F9"; duration: 1400 }
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                                ColorAnimation { to: "#E879F9"; duration: 2600 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
                             }
 
                             Image {

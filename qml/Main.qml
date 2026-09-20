@@ -45,18 +45,7 @@ Window {
         else if (currentPage === "artists") artistList = buildArtistList();
     }
 
-    // Refresh artist list periodically while images are loading
-    Timer {
-        id: artistImageRefreshTimer
-        interval: 1500
-        repeat: true
-        running: root.currentPage === "artists"
-        onTriggered: {
-            if (root.currentPage === "artists") {
-                root.artistList = buildArtistList();
-            }
-        }
-    }
+
 
     // Category store: filePath -> categoryName
     property var trackCategories: ({})
@@ -1035,10 +1024,10 @@ Window {
                             SequentialAnimation on border.color {
                                 running: true
                                 loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                                ColorAnimation { to: "#E879F9"; duration: 1400 }
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                                ColorAnimation { to: "#E879F9"; duration: 2600 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
                             }
 
                             ColumnLayout {
@@ -1283,10 +1272,10 @@ Window {
                             SequentialAnimation on border.color {
                                 running: true
                                 loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                                ColorAnimation { to: "#E879F9"; duration: 1400 }
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                                ColorAnimation { to: "#E879F9"; duration: 2600 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
                             }
 
                             ColumnLayout {
@@ -1449,10 +1438,10 @@ Window {
                             SequentialAnimation on border.color {
                                 running: true
                                 loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
-                                ColorAnimation { to: "#A78BFA"; duration: 1400 }
-                                ColorAnimation { to: "#E879F9"; duration: 1400 }
-                                ColorAnimation { to: "#22D3EE"; duration: 1400 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
+                                ColorAnimation { to: "#E879F9"; duration: 2600 }
+                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
                             }
 
                             ColumnLayout {
@@ -1838,7 +1827,7 @@ Window {
                                     property real baseHue: 180 + (index / 19.0) * 130
                                     property real hueOffset: 0
                                     NumberAnimation on hueOffset {
-                                        running: true
+                                        running: playback.playing
                                         loops: Animation.Infinite
                                         from: -10
                                         to: 10
@@ -2279,11 +2268,11 @@ Window {
                         }
 
                         Timer {
-                            interval: 16
-                            running: playback.playing
+                            interval: 33
+                            running: playback.playing && root.showNowPlaying
                             repeat: true
                             onTriggered: {
-                                wavyRing.phase += 0.15;
+                                wavyRing.phase += 0.25;
                                 wavyRing.requestPaint();
                             }
                         }
@@ -2301,7 +2290,7 @@ Window {
                             // Wave amplitude scales with energy too
                             var waveAmp = 8 + drive * 30;
 
-                            var steps = 72;
+                            var steps = 48;
 
                             // ---- Outer magenta halo ----
                             ctx.beginPath();
@@ -2493,7 +2482,7 @@ Window {
                                 property real baseHue: 180 + (index / 47.0) * 130
                                 property real hueOffset: 0
                                 NumberAnimation on hueOffset {
-                                    running: true
+                                    running: playback.playing
                                     loops: Animation.Infinite
                                     from: -10
                                     to: 10
@@ -2523,7 +2512,8 @@ Window {
                                         NumberAnimation { duration: 90; easing.type: Easing.OutQuad }
                                     }
 
-                                    layer.enabled: true
+                                    // MultiEffect only while playing — cuts idle cost by 48x
+                                    layer.enabled: playback.playing
                                     layer.effect: MultiEffect {
                                         shadowEnabled: true
                                         shadowColor: Qt.hsla(finalHue / 360, 0.9, 0.6, 1.0)

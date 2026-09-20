@@ -3,6 +3,8 @@
 #include <cmath>
 #include <numeric>
 
+#include <QElapsedTimer>
+
 AudioAnalyzer::AudioAnalyzer(QObject* parent)
     : QObject(parent)
 {
@@ -25,6 +27,13 @@ AudioAnalyzer::AudioAnalyzer(QObject* parent)
 }
 
 void AudioAnalyzer::processBuffer(const QAudioBuffer& buffer) {
+    // Throttle: skip frames arriving faster than ~30fps
+    // (QAudioBufferOutput fires at ~43Hz; we only need 30 for smooth visuals)
+    static QElapsedTimer s_throttle;
+    if (!s_throttle.isValid()) s_throttle.start();
+    if (s_throttle.elapsed() < 30) return;
+    s_throttle.restart();
+
     if (!buffer.isValid()) return;
 
     const auto fmt = buffer.format();

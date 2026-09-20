@@ -56,7 +56,7 @@ Item {
         target: lyrics
         function onStatusChanged() {
             if (lyrics.status === "found") {
-                Qt.callLater(root.saveLyricsToCache);
+                root.saveLyricsToCache();
             }
         }
     }
