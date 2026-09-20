@@ -35,6 +35,8 @@ qt_add_executable(void
     src/player/LyricsFetcher.h
     src/player/LyricsFetcher.cpp
     src/player/Playback.cpp
+    src/player/ArtistImageFetcher.h
+    src/player/ArtistImageFetcher.cpp
 )
 # Register Theme.qml as a QML singleton
 set_source_files_properties(qml/theme/Theme.qml PROPERTIES
@@ -46,6 +48,7 @@ qt_add_qml_module(void
     QML_FILES
         qml/Main.qml
         qml/components/AlbumDetail.qml
+        qml/components/ArtistDetail.qml
         qml/components/LyricsPanel.qml
         qml/components/LyricsSyncDialog.qml
     RESOURCES

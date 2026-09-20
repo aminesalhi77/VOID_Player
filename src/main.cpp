@@ -7,9 +7,11 @@
 #include <QPalette>
 #include <QColor>
 
+#include "library/Track.h"
 #include "library/Library.h"
 #include "models/TrackModel.h"
 #include "player/Playback.h"
+#include "player/ArtistImageFetcher.h"
 #include "player/LyricsFetcher.h"
 #include <QAudioBuffer>
 
@@ -25,6 +27,7 @@ int main(int argc, char *argv[])
     // Force GStreamer backend — FFmpeg backend lacks QAudioBufferOutput support
     qputenv("QT_MEDIA_BACKEND", "gstreamer");
 
+    qRegisterMetaType<Track>("Track");
     QApplication app(argc, argv);
     app.setApplicationName("VOID");
     app.setApplicationDisplayName("VOID");
@@ -50,12 +53,14 @@ int main(int argc, char *argv[])
     Library library;
     TrackModel trackModel(&library);
     Playback playback;
+    ArtistImageFetcher artistImages;
     LyricsFetcher lyrics;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("library", &library);
     engine.rootContext()->setContextProperty("trackModel", &trackModel);
     engine.rootContext()->setContextProperty("playback", &playback);
+    engine.rootContext()->setContextProperty("artistImages", &artistImages);
     engine.rootContext()->setContextProperty("lyrics", &lyrics);
 
     QObject::connect(

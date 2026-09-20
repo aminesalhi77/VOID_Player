@@ -13,6 +13,7 @@ class Library : public QObject {
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
     Q_PROPERTY(int scanCurrent READ scanCurrent NOTIFY scanProgressChanged)
     Q_PROPERTY(int scanTotal READ scanTotal NOTIFY scanProgressChanged)
+    Q_PROPERTY(int trackCount READ trackCount NOTIFY tracksChanged)
 
 public:
     explicit Library(QObject* parent = nullptr);
@@ -47,6 +48,7 @@ public:
     bool scanning() const { return m_scanning; }
     int scanCurrent() const { return m_scanCurrent; }
     int scanTotal() const { return m_scanTotal; }
+    int trackCount() const { return m_tracks.size(); }
 
 signals:
     void scanStarted();

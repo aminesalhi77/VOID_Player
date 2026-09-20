@@ -37,10 +37,25 @@ Window {
     property var artistList: []
     property var albumDetail: null
     property var albumTracks: []
+    property var artistDetail: null
+    property var artistTracks: []
 
     onCurrentPageChanged: {
         if (currentPage === "albums") albumList = buildAlbumList();
         else if (currentPage === "artists") artistList = buildArtistList();
+    }
+
+    // Refresh artist list periodically while images are loading
+    Timer {
+        id: artistImageRefreshTimer
+        interval: 1500
+        repeat: true
+        running: root.currentPage === "artists"
+        onTriggered: {
+            if (root.currentPage === "artists") {
+                root.artistList = buildArtistList();
+            }
+        }
     }
 
     // Category store: filePath -> categoryName
@@ -129,7 +144,7 @@ Window {
         library.loadFromDb();
 
         // 2. Only auto-scan if the DB was empty
-        if (library.count() === 0 && !hasAutoScanned) {
+        if (library.trackCount === 0 && !hasAutoScanned) {
             hasAutoScanned = true;
             console.log("VOID: empty library — auto-scanning ~/Music...");
             library.scanDefaultMusicFolder();
@@ -454,6 +469,8 @@ Window {
                                 onClicked: {
                                     root.albumDetail = null;
                                     root.albumTracks = [];
+                                    root.artistDetail = null;
+                                    root.artistTracks = [];
                                     if (index === 0) { root.currentCategory = ""; root.currentPage = "library"; }
                                     else if (index === 1) root.currentPage = "albums";
                                     else if (index === 2) root.currentPage = "artists";
@@ -629,7 +646,7 @@ Window {
                                 }
                                 Text {
                                     text: {
-                                        if (root.currentCategory === "") return library.count() + " tracks in library";
+                                        if (root.currentCategory === "") return library.trackCount + " tracks in library";
                                         var n = root.countInCategory(root.currentCategory);
                                         return n + " track" + (n === 1 ? "" : "s") + " in this category";
                                     }
@@ -1144,12 +1161,74 @@ Window {
                 }
             }
 
+            // ============ ARTIST DETAIL (overlay) ============
+            Item {
+                id: artistDetailHost
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: root.currentPage === "artists" && root.artistDetail !== null
+                clip: true
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "#0A0A14"
+                    opacity: parent.visible ? 0.92 : 0
+                }
+
+                ArtistDetail {
+                    id: artistDetailView
+                    anchors.fill: parent
+
+                    opacity: (root.currentPage === "artists" && root.artistDetail !== null) ? 1 : 0
+                    scale:   (root.currentPage === "artists" && root.artistDetail !== null) ? 1 : 0.94
+
+                    Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                    Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+                    artistName: root.artistDetail ? root.artistDetail.name : ""
+                    avatarUrl:  {
+                        if (!root.artistDetail) return "";
+                        for (var i = 0; i < root.artistList.length; i++) {
+                            if (root.artistList[i].name === root.artistDetail.name)
+                                return root.artistList[i].coverUrl || "";
+                        }
+                        return "";
+                    }
+                    artistImageUrl: root.artistDetail
+                                    ? (artistImages.get(root.artistDetail.name) || "")
+                                    : ""
+                    tracks:     root.artistTracks ? root.artistTracks : []
+
+                    accentCyan:   root.accentCyan
+                    accentPurple: root.accentPurple
+                    accentPink:   root.accentPink
+                    textPrimary:  root.textPrimary
+                    textDim:      root.textDim
+                    textMute:     root.textMute
+                    bgPanel:      root.bgPanel
+                    bgDeep:       root.bgDeep
+
+                    onBack: root.closeArtist()
+                    onOpenNowPlaying: root.showNowPlaying = true
+
+                    onPlayTrack: function(trackIndex) {
+                        if (trackIndex >= 0 && trackIndex < root.artistTracks.length) {
+                            playback.setQueue(library.tracks(), root.artistTracks[trackIndex].index);
+                        }
+                    }
+                }
+            }
+
             // ============ ARTISTS PAGE ============
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                visible: root.currentPage === "artists"
+                visible: root.currentPage === "artists" && root.artistDetail === null
+                opacity: root.artistDetail === null ? 1 : 0
+                scale: root.artistDetail === null ? 1 : 0.94
+                Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                Behavior on scale   { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
                 Rectangle {
                     Layout.fillWidth: true
@@ -1218,23 +1297,68 @@ Window {
                                 Item {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 116
+                                    Layout.alignment: Qt.AlignHCenter
+
                                     Rectangle {
+                                        id: artistAvatarCircle
                                         anchors.centerIn: parent
                                         width: 96; height: 96
                                         radius: 48
-                                        gradient: Gradient {
-                                            GradientStop { position: 0.0; color: cyanLine }
-                                            GradientStop { position: 1.0; color: purpleLine }
-                                        }
+                                        color: bgPanel
                                         border.color: accentCyan
-                                        border.width: 1
-                                    }
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.name.charAt(0).toUpperCase()
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 40
-                                        font.weight: Font.Bold
+                                        border.width: 2
+
+                                        // Image with circular mask
+                                        Image {
+                                            id: avatarImg
+                                            anchors.fill: parent
+                                            anchors.margins: -28
+                                            source: (modelData.artistImageUrl && modelData.artistImageUrl !== "")
+                                                    ? modelData.artistImageUrl
+                                                    : modelData.coverUrl
+                                            fillMode: Image.PreserveAspectCrop
+                                            visible: source !== ""
+                                            asynchronous: true
+                                            sourceSize.width: 256
+                                            sourceSize.height: 256
+                                            mipmap: true
+                                            smooth: true
+                                            layer.enabled: true
+                                            layer.effect: MultiEffect {
+                                                maskEnabled: true
+                                                maskSource: artistAvatarMaskItem
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            visible: avatarImg.source === "" || avatarImg.source === undefined
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: cyanLine }
+                                                GradientStop { position: 1.0; color: purpleLine }
+                                            }
+                                        }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.name.charAt(0).toUpperCase()
+                                            color: "#FFFFFF"
+                                            font.pixelSize: 40
+                                            font.weight: Font.Bold
+                                            visible: avatarImg.source === "" || avatarImg.source === undefined
+                                        }
+
+                                        // Circular mask
+                                        Item {
+                                            id: artistAvatarMaskItem
+                                            anchors.fill: parent
+                                            visible: false
+                                            layer.enabled: true
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 48
+                                                color: "white"
+                                            }
+                                        }
                                     }
                                 }
 
@@ -1255,7 +1379,11 @@ Window {
                                     horizontalAlignment: Text.AlignHCenter
                                 }
                             }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.openArtist(modelData.name)
+                            }
                         }
                     }
                 }
@@ -2746,6 +2874,52 @@ Window {
         }
     }
 
+    // Refresh artist list when new artist images arrive
+    Connections {
+        target: artistImages
+        function onImageReady(artistName, imageUrl) {
+            // Update the artist list in-place
+            var list = root.artistList.slice();
+            var changed = false;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].name === artistName) {
+                    var copy = Object.assign({}, list[i]);
+                    copy.artistImageUrl = imageUrl;
+                    list[i] = copy;
+                    changed = true;
+                }
+            }
+            if (changed) root.artistList = list;
+        }
+    }
+
+    function openArtist(artistName) {
+        var list = [];
+        for (var i = 0; i < trackModel.rowCount(); i++) {
+            var idx = trackModel.index(i, 0);
+            var art = trackModel.data(idx, 259);
+            if (!art) art = "Unknown Artist";
+            if (art !== artistName) continue;
+            list.push({
+                index: i,
+                title:        trackModel.data(idx, 258),
+                artist:       art,
+                album:        trackModel.data(idx, 260),
+                durationText: trackModel.data(idx, 264),
+                coverUrl:     trackModel.data(idx, 266),
+                filePath:     trackModel.data(idx, 257)
+            });
+        }
+        root.artistTracks = list;
+        root.artistDetail = { name: artistName };
+        console.log("VOID: openArtist:", artistName, "→", list.length, "tracks");
+    }
+
+    function closeArtist() {
+        root.artistDetail = null;
+        root.artistTracks = [];
+    }
+
     function openAlbum(albumName, artistName) {
         var list = [];
         for (var i = 0; i < trackModel.rowCount(); i++) {
@@ -2865,9 +3039,17 @@ Window {
         for (var i = 0; i < trackModel.rowCount(); i++) {
             var idx = trackModel.index(i, 0);
             var artistName = trackModel.data(idx, 259);
+            var coverUrl   = trackModel.data(idx, 266);
             if (!artistName) artistName = "Unknown Artist";
             if (groups[artistName] === undefined) {
-                groups[artistName] = { name: artistName, count: 0, coverUrl: "" };
+                groups[artistName] = {
+                    name: artistName,
+                    count: 0,
+                    coverUrl: coverUrl || "",
+                    artistImageUrl: artistImages.get(artistName) || ""
+                };
+            } else if (groups[artistName].coverUrl === "" && coverUrl) {
+                groups[artistName].coverUrl = coverUrl;
             }
             groups[artistName].count++;
         }
