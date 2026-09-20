@@ -10,6 +10,7 @@
 #include "library/Library.h"
 #include "models/TrackModel.h"
 #include "player/Playback.h"
+#include "player/LyricsFetcher.h"
 #include <QAudioBuffer>
 
 int main(int argc, char *argv[])
@@ -49,11 +50,13 @@ int main(int argc, char *argv[])
     Library library;
     TrackModel trackModel(&library);
     Playback playback;
+    LyricsFetcher lyrics;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("library", &library);
     engine.rootContext()->setContextProperty("trackModel", &trackModel);
     engine.rootContext()->setContextProperty("playback", &playback);
+    engine.rootContext()->setContextProperty("lyrics", &lyrics);
 
     QObject::connect(
         &engine,

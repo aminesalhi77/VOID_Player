@@ -32,6 +32,8 @@ qt_add_executable(void
     src/player/Playback.h
     src/player/AudioAnalyzer.h
     src/player/AudioAnalyzer.cpp
+    src/player/LyricsFetcher.h
+    src/player/LyricsFetcher.cpp
     src/player/Playback.cpp
 )
 # Register Theme.qml as a QML singleton
@@ -44,6 +46,8 @@ qt_add_qml_module(void
     QML_FILES
         qml/Main.qml
         qml/components/AlbumDetail.qml
+        qml/components/LyricsPanel.qml
+        qml/components/LyricsSyncDialog.qml
     RESOURCES
     qml/theme/Theme.qml
         qml/assets/icons/disc.svg

@@ -20,6 +20,19 @@ public:
     int  count() const;
     void clear();
 
+    // Custom lyrics storage
+    bool saveLyrics(const QString& filePath, const QString& content, bool isSynced);
+    QString loadLyrics(const QString& filePath, bool* isSynced = nullptr) const;
+    bool hasLyrics(const QString& filePath) const;
+    bool removeLyrics(const QString& filePath);
+    int  lyricsCount() const;
+    // Auto-fetched lyrics cache
+    bool    saveCachedLyrics(const QString& filePath, const QString& content,
+                             bool isSynced, const QString& source);
+    QString loadCachedLyrics(const QString& filePath, bool* isSynced,
+                             QString* source) const;
+    bool    hasCachedLyrics(const QString& filePath) const;
+
 private:
     bool createSchema();
     QSqlDatabase m_db;

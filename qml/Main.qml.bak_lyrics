@@ -110,7 +110,6 @@ Window {
     }
     property string visualizerMode: "bars"
     property bool showLyrics: false
-    property bool showLyricsDialog: false
     property real vizTick: 0
 
     // Single global animation driving every bar
@@ -849,49 +848,37 @@ Window {
                                         Layout.fillWidth: true
                                     }
 
-                                    // Category badges (up to 3 shown) — neon style
+                                    // Category badges (up to 3 shown)
                                     Repeater {
                                         model: root.getCategories(filePath).slice(0, 3)
                                         delegate: Rectangle {
-                                            id: badge
                                             required property var modelData
-
-                                            // Find the category color
-                                            property string catColor: {
+                                            width: badgeLabel.implicitWidth + 14
+                                            height: 18
+                                            radius: 9
+                                            color: {
+                                                for (var i = 0; i < root.categoryList.length; i++) {
+                                                    if (root.categoryList[i].name === modelData)
+                                                        return root.categoryList[i].color + "33";
+                                                }
+                                                return "#1AFFFFFF";
+                                            }
+                                            border.color: {
                                                 for (var i = 0; i < root.categoryList.length; i++) {
                                                     if (root.categoryList[i].name === modelData)
                                                         return root.categoryList[i].color;
                                                 }
-                                                return "#8A8AA0";
+                                                return "#26FFFFFF";
                                             }
-
-                                            width: badgeLabel.implicitWidth + 18
-                                            height: 20
-                                            radius: 10
-
-                                            // Neon fill — category color at 25% alpha (AARRGGBB)
-                                            color: "#40" + badge.catColor.substring(1)
-
-                                            // Neon border — full category color
-                                            border.color: badge.catColor
                                             border.width: 1
-
-                                            // Glow
-                                            layer.enabled: true
-                                            layer.effect: MultiEffect {
-                                                shadowEnabled: true
-                                                shadowColor: badge.catColor
-                                                shadowBlur: 0.6
-                                            }
 
                                             Text {
                                                 id: badgeLabel
                                                 anchors.centerIn: parent
                                                 text: modelData
-                                                color: badge.catColor
-                                                font.pixelSize: 10
-                                                font.weight: Font.Bold
-                                                font.letterSpacing: 0.3
+                                                color: "#FFFFFF"
+                                                font.pixelSize: 9
+                                                font.weight: Font.Medium
                                             }
                                         }
                                     }
@@ -2614,12 +2601,6 @@ Window {
             albumName: playback.album
             durationSec: Math.floor(playback.duration / 1000)
             currentPositionMs: playback.position
-            filePath: {
-                if (playback.currentIndex < 0) return "";
-                var tracks = library.tracks();
-                if (playback.currentIndex >= tracks.length) return "";
-                return tracks[playback.currentIndex].filePath;
-            }
 
             accentCyan:   root.accentCyan
             accentPurple: root.accentPurple
@@ -2629,10 +2610,6 @@ Window {
 
             onSeekRequested: function(timeMs) {
                 playback.seek(timeMs);
-            }
-
-            onAddLyricsRequested: {
-                root.showLyricsDialog = true;
             }
         }
 
@@ -2779,52 +2756,6 @@ Window {
     function closeAlbum() {
         root.albumDetail = null;
         root.albumTracks = [];
-    }
-
-    // ============================================
-    //  LYRICS SYNC DIALOG
-    // ============================================
-    LyricsSyncDialog {
-        id: lyricsSyncDialog
-
-        anchors.fill: parent
-        visible: root.showLyricsDialog
-        opacity: visible ? 1 : 0
-        z: 200
-
-        Behavior on opacity { NumberAnimation { duration: 220 } }
-
-        trackTitle: playback.title
-        artistName: playback.artist
-
-        accentCyan:   root.accentCyan
-        accentPurple: root.accentPurple
-        textPrimary:  root.textPrimary
-        textDim:      root.textDim
-        textMute:     root.textMute
-        bgPanel:      root.bgPanel
-
-        onCloseRequested: root.showLyricsDialog = false
-
-        onSaveRequested: function(lrcText, isSynced) {
-            var fp = "";
-            if (playback.currentIndex >= 0) {
-                var tracks = library.tracks();
-                if (playback.currentIndex < tracks.length)
-                    fp = tracks[playback.currentIndex].filePath;
-            }
-            if (fp === "") {
-                console.log("VOID: cannot save lyrics — no file path");
-                return;
-            }
-            library.saveCustomLyrics(fp, lrcText, isSynced);
-            console.log("VOID: saved custom lyrics for", fp);
-
-            // Reload lyrics panel with the new content
-            lyrics.loadCustomText(lrcText, isSynced);
-
-            root.showLyricsDialog = false;
-        }
     }
 
     function countInCategory(categoryName) {

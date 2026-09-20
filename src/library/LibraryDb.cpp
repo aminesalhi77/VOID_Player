@@ -4,6 +4,7 @@
 #include <QSqlError>
 #include <QDebug>
 #include <QVariant>
+#include <QDateTime>
 
 LibraryDb::LibraryDb()
     : m_connectionName("void_library")
@@ -36,7 +37,7 @@ void LibraryDb::close() {
 
 bool LibraryDb::createSchema() {
     QSqlQuery q(m_db);
-    return q.exec(
+    bool ok = q.exec(
         "CREATE TABLE IF NOT EXISTS tracks ("
         "  path         TEXT PRIMARY KEY,"
         "  title        TEXT,"
@@ -47,6 +48,28 @@ bool LibraryDb::createSchema() {
         "  track_number INTEGER,"
         "  duration_ms  INTEGER,"
         "  cover_path   TEXT"
+        ")"
+    );
+    if (!ok) return false;
+
+    if (!ok) return false;
+
+    if (!q.exec(
+        "CREATE TABLE IF NOT EXISTS lyrics_cache ("
+        "  file_path  TEXT PRIMARY KEY,"
+        "  content    TEXT NOT NULL,"
+        "  is_synced  INTEGER DEFAULT 0,"
+        "  source     TEXT,"
+        "  cached_at  INTEGER"
+        ")"
+    )) return false;
+
+    return q.exec(
+        "CREATE TABLE IF NOT EXISTS custom_lyrics ("
+        "  file_path  TEXT PRIMARY KEY,"
+        "  content    TEXT NOT NULL,"
+        "  is_synced  INTEGER DEFAULT 0,"
+        "  added_at   INTEGER"
         ")"
     );
 }
@@ -116,4 +139,91 @@ int LibraryDb::count() const {
 void LibraryDb::clear() {
     QSqlQuery q(m_db);
     q.exec("DELETE FROM tracks");
+}
+
+// ============================================================
+//  Custom lyrics storage
+// ============================================================
+
+bool LibraryDb::saveLyrics(const QString& filePath, const QString& content, bool isSynced) {
+    QSqlQuery q(m_db);
+    q.prepare(
+        "INSERT OR REPLACE INTO custom_lyrics "
+        "(file_path, content, is_synced, added_at) "
+        "VALUES (?, ?, ?, ?)"
+    );
+    q.addBindValue(filePath);
+    q.addBindValue(content);
+    q.addBindValue(isSynced ? 1 : 0);
+    q.addBindValue(QDateTime::currentSecsSinceEpoch());
+    return q.exec();
+}
+
+QString LibraryDb::loadLyrics(const QString& filePath, bool* isSynced) const {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT content, is_synced FROM custom_lyrics WHERE file_path = ? LIMIT 1");
+    q.addBindValue(filePath);
+    if (!q.exec() || !q.next()) {
+        if (isSynced) *isSynced = false;
+        return {};
+    }
+    if (isSynced) *isSynced = (q.value(1).toInt() != 0);
+    return q.value(0).toString();
+}
+
+bool LibraryDb::hasLyrics(const QString& filePath) const {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT 1 FROM custom_lyrics WHERE file_path = ? LIMIT 1");
+    q.addBindValue(filePath);
+    return q.exec() && q.next();
+}
+
+bool LibraryDb::removeLyrics(const QString& filePath) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM custom_lyrics WHERE file_path = ?");
+    q.addBindValue(filePath);
+    return q.exec();
+}
+
+int LibraryDb::lyricsCount() const {
+    QSqlQuery q(m_db);
+    if (!q.exec("SELECT COUNT(*) FROM custom_lyrics") || !q.next()) return 0;
+    return q.value(0).toInt();
+}
+
+// ---- Auto-fetched lyrics cache ----
+
+bool LibraryDb::saveCachedLyrics(const QString& filePath, const QString& content,
+                                 bool isSynced, const QString& source) {
+    QSqlQuery q(m_db);
+    q.prepare("INSERT OR REPLACE INTO lyrics_cache "
+              "(file_path, content, is_synced, source, cached_at) VALUES (?, ?, ?, ?, ?)");
+    q.addBindValue(filePath);
+    q.addBindValue(content);
+    q.addBindValue(isSynced ? 1 : 0);
+    q.addBindValue(source);
+    q.addBindValue(QDateTime::currentSecsSinceEpoch());
+    return q.exec();
+}
+
+QString LibraryDb::loadCachedLyrics(const QString& filePath, bool* isSynced,
+                                    QString* source) const {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT content, is_synced, source FROM lyrics_cache WHERE file_path = ? LIMIT 1");
+    q.addBindValue(filePath);
+    if (!q.exec() || !q.next()) {
+        if (isSynced) *isSynced = false;
+        if (source) *source = "";
+        return {};
+    }
+    if (isSynced) *isSynced = (q.value(1).toInt() != 0);
+    if (source) *source = q.value(2).toString();
+    return q.value(0).toString();
+}
+
+bool LibraryDb::hasCachedLyrics(const QString& filePath) const {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT 1 FROM lyrics_cache WHERE file_path = ? LIMIT 1");
+    q.addBindValue(filePath);
+    return q.exec() && q.next();
 }

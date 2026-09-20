@@ -25,6 +25,25 @@ public:
     Q_INVOKABLE void scanDefaultMusicFolder();
     Q_INVOKABLE void loadFromDb();
 
+    // Custom lyrics (from QML)
+    Q_INVOKABLE bool    saveCustomLyrics(const QString& filePath,
+                                        const QString& content,
+                                        bool isSynced);
+    Q_INVOKABLE QString loadCustomLyrics(const QString& filePath) const;
+    Q_INVOKABLE bool    customLyricsSynced(const QString& filePath) const;
+    Q_INVOKABLE bool    hasCustomLyrics(const QString& filePath) const;
+    Q_INVOKABLE bool    removeCustomLyrics(const QString& filePath);
+
+    // Auto-fetched lyrics cache
+    Q_INVOKABLE bool    saveCachedLyrics(const QString& filePath,
+                                        const QString& content,
+                                        bool isSynced,
+                                        const QString& source);
+    Q_INVOKABLE QString loadCachedLyrics(const QString& filePath);
+    Q_INVOKABLE bool    cachedLyricsSynced(const QString& filePath) const;
+    Q_INVOKABLE QString cachedLyricsSource(const QString& filePath) const;
+    Q_INVOKABLE bool    hasCachedLyrics(const QString& filePath) const;
+
     bool scanning() const { return m_scanning; }
     int scanCurrent() const { return m_scanCurrent; }
     int scanTotal() const { return m_scanTotal; }

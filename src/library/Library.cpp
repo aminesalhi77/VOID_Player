@@ -167,3 +167,57 @@ void Library::scanDefaultMusicFolder() {
     }
     scanFolder(musicDir);
 }
+
+// ---- Custom lyrics ----
+
+bool Library::saveCustomLyrics(const QString& filePath, const QString& content, bool isSynced) {
+    return m_db.saveLyrics(filePath, content, isSynced);
+}
+
+QString Library::loadCustomLyrics(const QString& filePath) const {
+    return m_db.loadLyrics(filePath, nullptr);
+}
+
+bool Library::customLyricsSynced(const QString& filePath) const {
+    bool synced = false;
+    m_db.loadLyrics(filePath, &synced);
+    return synced;
+}
+
+bool Library::hasCustomLyrics(const QString& filePath) const {
+    return m_db.hasLyrics(filePath);
+}
+
+bool Library::removeCustomLyrics(const QString& filePath) {
+    return m_db.removeLyrics(filePath);
+}
+
+// ---- Auto-fetched lyrics cache ----
+
+bool Library::saveCachedLyrics(const QString& filePath, const QString& content,
+                              bool isSynced, const QString& source) {
+    bool ok = m_db.saveCachedLyrics(filePath, content, isSynced, source);
+    qDebug() << "VOID: saveCachedLyrics" << (ok ? "OK" : "FAILED")
+             << "path:" << filePath << "synced:" << isSynced << "source:" << source;
+    return ok;
+}
+
+QString Library::loadCachedLyrics(const QString& filePath) {
+    return m_db.loadCachedLyrics(filePath, nullptr, nullptr);
+}
+
+bool Library::cachedLyricsSynced(const QString& filePath) const {
+    bool synced = false;
+    m_db.loadCachedLyrics(filePath, &synced, nullptr);
+    return synced;
+}
+
+QString Library::cachedLyricsSource(const QString& filePath) const {
+    QString source;
+    m_db.loadCachedLyrics(filePath, nullptr, &source);
+    return source;
+}
+
+bool Library::hasCachedLyrics(const QString& filePath) const {
+    return m_db.hasCachedLyrics(filePath);
+}
