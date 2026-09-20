@@ -15,6 +15,7 @@ Item {
     property string filePath: ""
 
     signal addLyricsRequested()
+    signal refreshRequested()
 
     // Colors
     property color accentCyan:   "#22D3EE"
@@ -50,31 +51,6 @@ Item {
         lyrics.fetch(artistName, trackTitle, albumName, durationSec);
     }
 
-    // Save lyrics to cache whenever a fresh fetch completes
-    function saveLyricsToCache() {
-        if (filePath === "") return;
-        if (lyrics.status !== "found") return;
-        if (lyrics.source === "custom") return;   // already user-edited
-        if (lyrics.source === "cache") return;    // already from cache
-
-        var text = "";
-        for (var i = 0; i < lyrics.lines.length; i++) {
-            var l = lyrics.lines[i];
-            if (lyrics.synced && l.timeMs > 0) {
-                var s = l.timeMs / 1000.0;
-                var m = Math.floor(s / 60);
-                var sec = s - m * 60;
-                var minStr = (m < 10 ? "0" : "") + m;
-                var secStr = (sec < 10 ? "0" : "") + sec.toFixed(2);
-                text += "[" + minStr + ":" + secStr + "] " + l.text + "\n";
-            } else {
-                text += l.text + "\n";
-            }
-        }
-
-        var ok = library.saveCachedLyrics(filePath, text, lyrics.synced, lyrics.source);
-        console.log("VOID: cached lyrics from", lyrics.source, "success:", ok, "lines:", lyrics.lines.length);
-    }
 
     Connections {
         target: lyrics
@@ -93,6 +69,45 @@ Item {
         }
         function onTrackChanged() {
             lyrics.setPosition(0);
+        }
+    }
+
+    // Refresh button (top-right of panel)
+    Rectangle {
+        id: refreshBtn
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 8
+        anchors.rightMargin: 8
+        width: 32; height: 32
+        radius: 8
+        z: 100
+        color: refreshHover.hovered ? "#33A78BFA" : "#1AA78BFA"
+        border.color: root.accentPurple
+        border.width: 1
+        Behavior on color { ColorAnimation { duration: 140 } }
+
+        HoverHandler { id: refreshHover }
+
+        Text {
+            anchors.centerIn: parent
+            text: "⟳"
+            color: root.accentCyan
+            font.pixelSize: 16
+            font.weight: Font.Bold
+
+            RotationAnimation on rotation {
+                running: lyrics.status === "loading"
+                loops: Animation.Infinite
+                from: 0; to: 360
+                duration: 1000
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.refreshRequested()
         }
     }
 

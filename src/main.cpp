@@ -54,7 +54,10 @@ int main(int argc, char *argv[])
     TrackModel trackModel(&library);
     Playback playback;
     ArtistImageFetcher artistImages;
+    artistImages.setDb(&library.db());
+    artistImages.preloadFromDb();
     LyricsFetcher lyrics;
+    lyrics.setDb(&library.db());
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("library", &library);

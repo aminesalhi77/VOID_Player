@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QHash>
 #include <QList>
 #include <QSqlDatabase>
 #include "library/Track.h"
@@ -32,6 +33,12 @@ public:
     QString loadCachedLyrics(const QString& filePath, bool* isSynced,
                              QString* source) const;
     bool    hasCachedLyrics(const QString& filePath) const;
+    bool    removeCachedLyrics(const QString& filePath);
+
+    // Artist image cache
+    bool    saveArtistImage(const QString& artistName, const QString& imageUrl);
+    QString loadArtistImage(const QString& artistName) const;
+    QHash<QString, QString> loadAllArtistImages() const;
 
 private:
     bool createSchema();

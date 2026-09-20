@@ -221,3 +221,13 @@ QString Library::cachedLyricsSource(const QString& filePath) const {
 bool Library::hasCachedLyrics(const QString& filePath) const {
     return m_db.hasCachedLyrics(filePath);
 }
+
+// ---- Artist image cache ----
+
+bool Library::saveArtistImage(const QString& artist, const QString& url) {
+    return m_db.saveArtistImage(artist, url);
+}
+
+QString Library::loadArtistImage(const QString& artist) const {
+    return m_db.loadArtistImage(artist);
+}

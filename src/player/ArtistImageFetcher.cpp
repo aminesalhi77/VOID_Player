@@ -1,4 +1,5 @@
 #include "player/ArtistImageFetcher.h"
+#include "library/LibraryDb.h"
 
 #include <QUrl>
 #include <QUrlQuery>
@@ -12,6 +13,16 @@ ArtistImageFetcher::ArtistImageFetcher(QObject* parent)
     : QObject(parent)
     , m_net(new QNetworkAccessManager(this))
 {
+}
+
+void ArtistImageFetcher::setDb(LibraryDb* db) {
+    m_db = db;
+}
+
+void ArtistImageFetcher::preloadFromDb() {
+    if (!m_db) return;
+    m_cache = m_db->loadAllArtistImages();
+    qDebug() << "VOID: preloaded" << m_cache.size() << "artist images from DB";
 }
 
 void ArtistImageFetcher::setStatus(const QString& s) {
@@ -33,19 +44,15 @@ QString ArtistImageFetcher::get(const QString& artistName) {
 
     const QString key = cacheKey(artistName);
 
-    // Already fetched?
     if (m_cache.contains(key)) {
         return m_cache.value(key);
     }
-
-    // Already fetching?
     if (m_pending.contains(key)) {
         return "";
     }
 
     m_pending.insert(key, true);
 
-    // Deezer search API — no auth required
     QUrl url("https://api.deezer.com/search/artist");
     QUrlQuery q;
     q.addQueryItem("q", artistName);
@@ -62,26 +69,29 @@ QString ArtistImageFetcher::get(const QString& artistName) {
         reply->deleteLater();
         m_pending.remove(key);
 
-        if (reply->error() != QNetworkReply::NoError) {
-            qDebug() << "VOID: artist image fetch failed:" << reply->errorString();
-            m_cache.insert(key, "");
-            return;
-        }
-
-        const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
-        const QJsonArray data = obj.value("data").toArray();
-
         QString imageUrl;
-        if (!data.isEmpty()) {
-            const QJsonObject artist = data.first().toObject();
-            imageUrl = artist.value("picture_xl").toString();
-            if (imageUrl.isEmpty()) imageUrl = artist.value("picture_big").toString();
-            if (imageUrl.isEmpty()) imageUrl = artist.value("picture_medium").toString();
+
+        if (reply->error() == QNetworkReply::NoError) {
+            const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+            const QJsonArray data = obj.value("data").toArray();
+            if (!data.isEmpty()) {
+                const QJsonObject artist = data.first().toObject();
+                imageUrl = artist.value("picture_xl").toString();
+                if (imageUrl.isEmpty()) imageUrl = artist.value("picture_big").toString();
+                if (imageUrl.isEmpty()) imageUrl = artist.value("picture_medium").toString();
+            }
+        } else {
+            qDebug() << "VOID: artist image fetch failed:" << reply->errorString();
         }
 
+        // Cache in memory + DB (even if empty, so we don't re-fetch)
         m_cache.insert(key, imageUrl);
+        if (m_db) {
+            m_db->saveArtistImage(key, imageUrl);
+        }
+
         qDebug() << "VOID: artist image for" << artistName << "→"
-                 << (imageUrl.isEmpty() ? "(none)" : "found");
+                 << (imageUrl.isEmpty() ? "(none)" : "found (cached)");
 
         emit imageReady(artistName, imageUrl);
     });

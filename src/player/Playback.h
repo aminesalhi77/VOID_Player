@@ -21,6 +21,7 @@ class Playback : public QObject {
     Q_PROPERTY(QString artist READ artist NOTIFY trackChanged)
     Q_PROPERTY(QString album READ album NOTIFY trackChanged)
     Q_PROPERTY(QString coverUrl READ coverUrl NOTIFY trackChanged)
+    Q_PROPERTY(QString filePath READ filePath NOTIFY trackChanged)
     Q_PROPERTY(int currentIndex READ currentIndex NOTIFY trackChanged)
     Q_PROPERTY(AudioAnalyzer* analyzer READ analyzer CONSTANT)
 
@@ -35,6 +36,7 @@ public:
     QString artist() const { return m_current.artist; }
     QString album() const { return m_current.album; }
     QString coverUrl() const;
+    QString filePath() const { return m_current.filePath; }
     int currentIndex() const { return m_currentIndex; }
     AudioAnalyzer* analyzer() const { return m_analyzer; }
 

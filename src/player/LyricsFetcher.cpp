@@ -1,4 +1,5 @@
 #include "player/LyricsFetcher.h"
+#include "library/LibraryDb.h"
 
 #include <QUrl>
 #include <QUrlQuery>
@@ -28,6 +29,36 @@ LyricsFetcher::LyricsFetcher(QObject* parent)
 void LyricsFetcher::setStatus(const QString& s) {
     if (m_status == s) return;
     m_status = s;
+
+    // Auto-save to DB cache when a fetch succeeds
+    if (s == "found" && m_db && !m_currentFilePath.isEmpty()
+        && m_source != "custom" && m_source != "cache") {
+        qDebug() << "VOID: saving lyrics for" << m_currentFilePath
+                 << "source:" << m_source;
+
+        QString text;
+        for (int i = 0; i < m_lines.size(); i++) {
+            const QVariantMap lm = m_lines[i].toMap();
+            const QString line = lm.value("text").toString();
+            if (m_synced && lm.value("timeMs").toInt() > 0) {
+                const qint64 ms = lm.value("timeMs").toLongLong();
+                const int totalSec = ms / 1000;
+                const int min = totalSec / 60;
+                const double sec = ms / 1000.0 - min * 60;
+                text += QString("[%1:%2] %3\n")
+                    .arg(min, 2, 10, QChar('0'))
+                    .arg(sec, 5, 'f', 2, QChar('0'))
+                    .arg(line);
+            } else {
+                text += line + "\n";
+            }
+        }
+
+        bool ok = m_db->saveCachedLyrics(m_currentFilePath, text, m_synced, m_source);
+        qDebug() << "VOID: cached lyrics" << (ok ? "OK" : "FAIL")
+                 << m_source << m_lines.size() << "lines";
+    }
+
     emit statusChanged();
 }
 
@@ -79,7 +110,7 @@ void LyricsFetcher::clear() {
 
 void LyricsFetcher::fetch(const QString& artist, const QString& title,
                           const QString& album, int durationSec) {
-    if (artist.isEmpty() || title.isEmpty()) {
+    if (title.isEmpty()) {
         clear();
         setStatus("notfound");
         return;
@@ -89,6 +120,8 @@ void LyricsFetcher::fetch(const QString& artist, const QString& title,
     const QString ca = cleanArtist(artist);
     const QString ct = cleanTitle(title);
     const QString key = ca + "|" + ct;
+
+    // Reset internal state (but preserve m_currentFilePath — caller set it)
 
     if (key == m_lastQueryKey && m_status == "found") {
         return;   // Already loaded
@@ -471,4 +504,45 @@ void LyricsFetcher::setPosition(qint64 ms) {
         m_currentLine = idx;
         emit currentLineChanged();
     }
+}
+
+void LyricsFetcher::fetchForFile(const QString& filePath, const QString& artist,
+                                 const QString& title, const QString& album,
+                                 int durationSec) {
+    // ALWAYS reset state for the new track
+    clear();
+    m_currentFilePath = filePath;
+
+    // 1. Check DB cache first
+    if (m_db && !filePath.isEmpty()) {
+        bool isSynced = false;
+        QString src;
+        QString cached = m_db->loadCachedLyrics(filePath, &isSynced, &src);
+        if (!cached.isEmpty()) {
+            qDebug() << "VOID: using CACHED lyrics from" << src
+                     << "for" << filePath;
+            loadCustomText(cached, isSynced);
+            setSource("cache");
+            return;
+        }
+    }
+
+    // 2. Not cached → fetch from network
+    qDebug() << "VOID: no cache for" << filePath << "— fetching";
+    fetch(artist, title, album, durationSec);
+}
+
+void LyricsFetcher::forceFetch(const QString& filePath, const QString& artist,
+                               const QString& title, const QString& album,
+                               int durationSec) {
+    // Delete the cache entry so fetch() doesn't serve stale lyrics
+    if (m_db && !filePath.isEmpty()) {
+        m_db->removeCachedLyrics(filePath);
+    }
+
+    // Clear and fetch fresh from the network
+    clear();
+    m_currentFilePath = filePath;
+    qDebug() << "VOID: force-refreshing lyrics for" << filePath;
+    fetch(artist, title, album, durationSec);
 }

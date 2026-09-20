@@ -33,6 +33,13 @@ public:
     Q_INVOKABLE QString loadCustomLyrics(const QString& filePath) const;
     Q_INVOKABLE bool    customLyricsSynced(const QString& filePath) const;
     Q_INVOKABLE bool    hasCustomLyrics(const QString& filePath) const;
+
+    // Artist image cache (QML)
+    Q_INVOKABLE bool    saveArtistImage(const QString& artist, const QString& url);
+    Q_INVOKABLE QString loadArtistImage(const QString& artist) const;
+
+    // Direct DB access (for C++ fetchers)
+    LibraryDb& db() { return m_db; }
     Q_INVOKABLE bool    removeCustomLyrics(const QString& filePath);
 
     // Auto-fetched lyrics cache

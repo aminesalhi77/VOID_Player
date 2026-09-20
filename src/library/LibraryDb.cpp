@@ -64,6 +64,14 @@ bool LibraryDb::createSchema() {
         ")"
     )) return false;
 
+    if (!q.exec(
+        "CREATE TABLE IF NOT EXISTS artist_images ("
+        "  artist_name  TEXT PRIMARY KEY,"
+        "  image_url    TEXT,"
+        "  cached_at    INTEGER"
+        ")"
+    )) return false;
+
     return q.exec(
         "CREATE TABLE IF NOT EXISTS custom_lyrics ("
         "  file_path  TEXT PRIMARY KEY,"
@@ -226,4 +234,41 @@ bool LibraryDb::hasCachedLyrics(const QString& filePath) const {
     q.prepare("SELECT 1 FROM lyrics_cache WHERE file_path = ? LIMIT 1");
     q.addBindValue(filePath);
     return q.exec() && q.next();
+}
+
+// ---- Artist image cache ----
+
+bool LibraryDb::saveArtistImage(const QString& artistName, const QString& imageUrl) {
+    QSqlQuery q(m_db);
+    q.prepare("INSERT OR REPLACE INTO artist_images "
+              "(artist_name, image_url, cached_at) VALUES (?, ?, ?)");
+    q.addBindValue(artistName);
+    q.addBindValue(imageUrl);
+    q.addBindValue(QDateTime::currentSecsSinceEpoch());
+    return q.exec();
+}
+
+QString LibraryDb::loadArtistImage(const QString& artistName) const {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT image_url FROM artist_images WHERE artist_name = ? LIMIT 1");
+    q.addBindValue(artistName);
+    if (!q.exec() || !q.next()) return {};
+    return q.value(0).toString();
+}
+
+QHash<QString, QString> LibraryDb::loadAllArtistImages() const {
+    QHash<QString, QString> result;
+    QSqlQuery q(m_db);
+    if (!q.exec("SELECT artist_name, image_url FROM artist_images")) return result;
+    while (q.next()) {
+        result.insert(q.value(0).toString(), q.value(1).toString());
+    }
+    return result;
+}
+
+bool LibraryDb::removeCachedLyrics(const QString& filePath) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM lyrics_cache WHERE file_path = ?");
+    q.addBindValue(filePath);
+    return q.exec();
 }

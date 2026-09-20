@@ -6,6 +6,8 @@
 #include <QVariantList>
 #include <QRegularExpression>
 #include <QTimer>
+
+class LibraryDb;
 #include <QJsonObject>
 #include <QJsonArray>
 
@@ -26,9 +28,15 @@ public:
     bool synced() const { return m_synced; }
     QString source() const { return m_source; }
 
+    void setDb(LibraryDb* db) { m_db = db; }
+
 public slots:
     void fetch(const QString& artist, const QString& title,
                const QString& album, int durationSec);
+    void fetchForFile(const QString& filePath, const QString& artist,
+                      const QString& title, const QString& album, int durationSec);
+    void forceFetch(const QString& filePath, const QString& artist,
+                    const QString& title, const QString& album, int durationSec);
     void clear();
     void setPosition(qint64 ms);
     void loadCustomText(const QString& content, bool isSynced);
@@ -72,4 +80,6 @@ private:
     QString m_queryAlbum;
     int m_queryDuration = 0;
     QString m_lastQueryKey;
+    QString m_currentFilePath;
+    LibraryDb* m_db = nullptr;
 };

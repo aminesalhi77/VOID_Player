@@ -2742,12 +2742,7 @@ Window {
             albumName: playback.album
             durationSec: Math.floor(playback.duration / 1000)
             currentPositionMs: playback.position
-            filePath: {
-                if (playback.currentIndex < 0) return "";
-                var tracks = library.tracks();
-                if (playback.currentIndex >= tracks.length) return "";
-                return tracks[playback.currentIndex].filePath;
-            }
+            filePath: playback.filePath
 
             accentCyan:   root.accentCyan
             accentPurple: root.accentPurple
@@ -2761,6 +2756,21 @@ Window {
 
             onAddLyricsRequested: {
                 root.showLyricsDialog = true;
+            }
+
+            onRefreshRequested: {
+                var fp = "";
+                if (playback.currentIndex >= 0) {
+                    var tracks = library.tracks();
+                    if (playback.currentIndex < tracks.length)
+                        fp = tracks[playback.currentIndex].filePath;
+                }
+                if (fp !== "") {
+                    console.log("VOID: refresh requested for", fp);
+                    lyrics.forceFetch(fp, playback.artist, playback.title,
+                                      playback.album,
+                                      Math.floor(playback.duration / 1000));
+                }
             }
         }
 
