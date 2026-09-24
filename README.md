@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌑 VOID
+#  VOID
 
 ### A modern, native music player — built for people who love their library.
 
