@@ -180,11 +180,6 @@ void/
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome. Open an issue first to discuss what you'd like to change.
-
----
 
 ## 📜 License
 
