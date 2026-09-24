@@ -8,7 +8,10 @@
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?style=for-the-badge&logo=qt&logoColor=white)
 ![QML](https://img.shields.io/badge/QML-41CD52?style=for-the-badge&logo=qt&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-A78BFA?style=for-the-badge)
-![Platform](https://img.shields.io/badge/platform-Linux-22D3EE?style=for-the-badge&logo=linux&logoColor=white)
+
+![Linux](https://img.shields.io/badge/Linux-✅_stable-22D3EE?style=for-the-badge&logo=linux&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-🚧_in_progress-0078D6?style=for-the-badge&logo=windows&logoColor=white)
+![Android](https://img.shields.io/badge/Android-🚧_planned-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 
 **Fast. Beautiful. Yours.**
 
@@ -75,7 +78,18 @@ VOID is a from-scratch, native music player with a focus on speed, aesthetics, a
 
 ## 🚀 Install
 
-### Linux (source)
+### 📦 Platforms
+
+| Platform | Status | Notes |
+|---|---|---|
+| 🐧 **Linux** | ✅ **Stable** | Primary target — full feature set |
+| 🪟 **Windows** | 🚧 **In progress** | Build system ready, native packaging coming |
+| 📱 **Android** | 🚧 **Planned** | Same QML UI, native MediaStore integration |
+| 🍎 **macOS** | 💭 **Under consideration** | Same codebase, needs testing |
+
+---
+
+### 🐧 Linux (source build)
 
 **Requirements:**
 - Qt 6.5+
@@ -85,8 +99,8 @@ VOID is a from-scratch, native music player with a focus on speed, aesthetics, a
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/void.git
-cd void
+git clone https://github.com/aminesalhi77/VOID_Player.git
+cd VOID_Player
 
 # Build
 cmake -B build -G Ninja
@@ -99,10 +113,47 @@ cp build/void ~/.local/bin/void
 ./build/void
 ```
 
+### 🪟 Windows (source build)
+
+**Requirements:**
+- Visual Studio 2022 (or MinGW)
+- Qt 6.5+ for Windows
+- CMake 3.21+
+- TagLib 2.x
+
+```powershell
+# Clone
+git clone https://github.com/aminesalhi77/VOID_Player.git
+cd VOID_Player
+
+# Configure (adjust Qt path)
+cmake -B build -G "Visual Studio 17 2022" `
+  -DCMAKE_PREFIX_PATH="C:/Qt/6.8.0/msvc2022_64"
+
+# Build
+cmake --build build --config Release
+
+# Run
+.\build\Release\void.exe
+```
+
+> ⚠️ Windows support is actively being worked on. Native `.exe` installer coming soon.
+
+### 📱 Android (planned)
+
+Android support is on the roadmap. The QML UI is portable — main work is:
+- MediaStore integration for library scanning
+- Background playback service
+- Runtime permission handling
+
+> Follow the repo to get notified when the first Android build is available.
+
+---
+
 ### First run
 VOID will automatically:
-1. Create a local SQLite database at `~/.local/share/VOID/VOID/library.db`
-2. Scan `~/Music` for audio files
+1. Create a local SQLite database at `~/.local/share/VOID/VOID/library.db` (Linux) or `%APPDATA%\VOID\VOID\library.db` (Windows)
+2. Scan `~/Music` (Linux) or `%USERPROFILE%\Music` (Windows) for audio files
 3. Fetch lyrics and artist images in the background
 
 You can also **Add Custom Folder** from the Library view.
@@ -111,11 +162,67 @@ You can also **Add Custom Folder** from the Library view.
 
 ## 🖼️ Screenshots
 
-> Coming soon — the app is best experienced live.
+<div align="center">
+
+### 🏠 Main Library
+<img src="docs/screenshots/main-menu.png" width="800" alt="VOID main library view"/>
+
+### 🎵 Now Playing — Vinyl Mode
+<img src="docs/screenshots/now-playing-disc.png" width="800" alt="Vinyl disc with synced lyrics"/>
+
+### 🎶 Now Playing — Bars Mode
+<img src="docs/screenshots/now-playing-bars.png" width="800" alt="Spectrum bars with synced lyrics"/>
+
+### 💿 Albums
+<img src="docs/screenshots/albums.png" width="800" alt="Albums grid view"/>
+
+<table>
+<tr>
+<td width="50%">
+
+**Albums — list view**
+<img src="docs/screenshots/albums-list1.png" alt="Albums list 1"/>
+
+</td>
+<td width="50%">
+
+**Albums — detail**
+<img src="docs/screenshots/albums-list2.png" alt="Albums list 2"/>
+
+</td>
+</tr>
+</table>
+
+### 🎤 Artists
+<img src="docs/screenshots/artists.png" width="800" alt="Artists grid view"/>
+
+<table>
+<tr>
+<td width="50%">
+
+**Artists — list view**
+<img src="docs/screenshots/artists-list1.png" alt="Artists list 1"/>
+
+</td>
+<td width="50%">
+
+**Artists — detail**
+<img src="docs/screenshots/artists-list2.png" alt="Artists list 2"/>
+
+</td>
+</tr>
+</table>
+
+### ➕ Create Playlist
+<img src="docs/screenshots/create-playlist.png" width="500" alt="Create playlist dialog with neon icons"/>
+
+</div>
 
 ---
 
 ## 🛠️ Architecture
+
+Built on **Qt 6 + QML** — a single codebase for Linux, Windows, and (soon) Android.
 
 ```
 void/
@@ -165,21 +272,33 @@ void/
 
 ## 🗺️ Roadmap
 
+### ✅ Done
 - [x] Core playback + library
 - [x] Synced lyrics with auto-fetch
 - [x] User playlists with custom icons
 - [x] Keyboard shortcuts
 - [x] Neon theme
-- [ ] MPRIS / global media keys
+
+### 🚧 In Progress
+- [ ] **Windows build** — native installer + media keys (SMTC)
+- [ ] **Android port** — MediaStore + background service
+- [ ] MPRIS / global media keys (Linux)
 - [ ] Crossfade + gapless playback
+
+### 💭 Planned
 - [ ] Equalizer
 - [ ] Last.fm scrobbling
 - [ ] Chromecast / DLNA
 - [ ] Whisper-based lyrics auto-timing
-- [ ] Windows / macOS builds
+- [ ] **macOS build**
+
+### 🎯 Long-term
+- [ ] Auto-update system
+- [ ] Music visualizer modes (radial, waveform, particles)
+- [ ] Theme system (multiple color schemes)
+- [ ] Discord Rich Presence
 
 ---
-
 
 ## 📜 License
 
