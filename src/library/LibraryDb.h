@@ -40,6 +40,25 @@ public:
     QString loadArtistImage(const QString& artistName) const;
     QHash<QString, QString> loadAllArtistImages() const;
 
+    // ===== User playlists =====
+    struct Playlist {
+        int     id = -1;
+        QString name;
+        QString icon;
+        QString color;
+    };
+
+    QList<Playlist> listPlaylists() const;
+    int     createPlaylist(const QString& name, const QString& icon, const QString& color);
+    bool    renamePlaylist(int id, const QString& name);
+    bool    updatePlaylistIcon(int id, const QString& icon, const QString& color);
+    bool    deletePlaylist(int id);
+
+    QList<QString> playlistTrackPaths(int playlistId) const;
+    bool    addTrackToPlaylist(int playlistId, const QString& filePath);
+    bool    removeTrackFromPlaylist(int playlistId, const QString& filePath);
+    QList<int> playlistsForTrack(const QString& filePath) const;
+
 private:
     bool createSchema();
     QSqlDatabase m_db;

@@ -117,6 +117,101 @@ Window {
     property bool showLyricsDialog: false
     property real vizTick: 0
 
+    // ===== Keyboard shortcut state =====
+    property bool textFieldFocused: false
+    property bool arrowLeftPending: false
+    property bool arrowRightPending: false
+    property int  lastVolume: 50
+    property bool isMuted: false
+    property bool showVolumeFromKeyboard: false
+
+    // ===== Playlists =====
+    property var  userPlaylists: []
+    property int  currentPlaylistId: -1
+    property string currentPlaylistName: ""
+    property var  currentPlaylistTracks: []
+
+    property bool   showPlaylistManager: false
+    property string playlistManagerMode: "create"
+    property int    playlistEditId: -1
+    property string playlistEditName: ""
+
+
+    function refreshPlaylists() {
+        root.userPlaylists = library.listPlaylists();
+    }
+
+    function openCreatePlaylist() {
+        root.playlistManagerMode = "create";
+        root.playlistEditId = -1;
+        root.playlistEditName = "";
+        root.showPlaylistManager = true;
+    }
+
+    function openEditPlaylist(id, name) {
+        root.playlistManagerMode = "edit";
+        root.playlistEditId = id;
+        root.playlistEditName = name;
+        root.showPlaylistManager = true;
+    }
+
+    function openPlaylist(id, name) {
+        root.currentPlaylistId = id;
+        root.currentPlaylistName = name;
+        var paths = library.playlistTracks(id);
+        var allTracks = library.tracks();
+        var byPath = {};
+        for (var i = 0; i < allTracks.length; i++)
+            byPath[allTracks[i].filePath] = { t: allTracks[i], idx: i };
+        var list = [];
+        for (var j = 0; j < paths.length; j++) {
+            var m = byPath[paths[j]];
+            if (!m) continue;
+            list.push({
+                index: m.idx,
+                title: m.t.title,
+                artist: m.t.artist,
+                album: m.t.album,
+                durationText: m.t.durationText || "",
+                coverUrl: m.t.coverUrl || "",
+                filePath: m.t.filePath
+            });
+        }
+        root.currentPlaylistTracks = list;
+        root.currentPage = "playlist-detail";
+    }
+
+    function closePlaylist() {
+        root.currentPlaylistId = -1;
+        root.currentPlaylistName = "";
+        root.currentPlaylistTracks = [];
+        root.currentPage = "playlists";
+    }
+
+    function playPlaylistTrack(trackIndex) {
+        if (trackIndex < 0 || trackIndex >= root.currentPlaylistTracks.length) return;
+        // Build a queue that contains ONLY this playlist's tracks so next/prev
+        // stay inside the playlist
+        var allTracks = library.tracks();
+        var paths = library.playlistTracks(root.currentPlaylistId);
+        var queue = [];
+        for (var i = 0; i < paths.length; i++) {
+            for (var j = 0; j < allTracks.length; j++) {
+                if (allTracks[j].filePath === paths[i]) {
+                    queue.push(allTracks[j]);
+                    break;
+                }
+            }
+        }
+        playback.setQueue(queue, trackIndex);
+    }
+
+    function removeFromCurrentPlaylist(filePath) {
+        if (root.currentPlaylistId < 0) return;
+        library.removeTrackFromPlaylist(root.currentPlaylistId, filePath);
+        root.openPlaylist(root.currentPlaylistId, root.currentPlaylistName);
+    }
+
     // Single global animation driving every bar
     NumberAnimation on vizTick {
         running: playback.playing
@@ -144,6 +239,7 @@ Window {
             playback.loadQueueOnly(library.tracks());
             playback.restoreLastSession();
         });
+        root.refreshPlaylists();
     }
 
     // ============ BACKGROUND ============
@@ -262,6 +358,7 @@ Window {
 
                         TextField {
                             id: searchFocus
+                            onActiveFocusChanged: root.textFieldFocused = activeFocus
                             Layout.fillWidth: true
                             placeholderText: "Search in library..."
                             placeholderTextColor: textMute
@@ -420,7 +517,6 @@ Window {
                             { name: "Library",   icon: "♫", page: "library" },
                             { name: "Albums",    icon: "◉", page: "albums" },
                             { name: "Artists",   icon: "◐", page: "artists" },
-                            { name: "Playlists", icon: "▤", page: "playlists" }
                         ]
                         delegate: Rectangle {
                             required property var modelData
@@ -507,39 +603,48 @@ Window {
                             Layout.fillWidth: true
                         }
 
-                        Text { text: "+"; color: textMute; font.pixelSize: 14 }
+                        Text {
+                            text: "+"
+                            color: plusHover.hovered ? accentCyan : textMute
+                            font.pixelSize: 16
+                            font.weight: Font.Bold
+                            Behavior on color { ColorAnimation { duration: 140 } }
+
+                            HoverHandler { id: plusHover }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -8
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.openCreatePlaylist()
+                            }
+                        }
                     }
 
-                    Repeater {
-                        model: [
-                            { name: "Favorites",   icon: "♥",   color: "#E879F9" },
-                            { name: "Chill Vibes", icon: "▮▮▮", color: "#22D3EE" },
-                            { name: "Workout",     icon: "◮",   color: "#A78BFA" },
-                            { name: "Anime OST",   icon: "☆",   color: "#F472B6" },
-                            { name: "Gaming",      icon: "◘",   color: "#3B82F6" },
-                            { name: "Late Night",  icon: "☾",   color: "#8B5CF6" }
-                        ]
+                                        Repeater {
+                        model: root.userPlaylists
+
                         delegate: Rectangle {
                             required property var modelData
                             Layout.fillWidth: true
                             Layout.preferredHeight: 32
                             radius: 8
-                            color: {
-                                if (root.currentCategory === modelData.name) return "#33A78BFA";
-                                if (plHover.hovered) return greySoft;
-                                return "transparent";
-                            }
-                            border.color: root.currentCategory === modelData.name ? "#66A78BFA" : "transparent"
-                            border.width: 1
+                            color: plHover.hovered ? greySoft : "transparent"
 
                             HoverHandler { id: plHover }
 
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.currentCategory = (root.currentCategory === modelData.name)
-                                        ? "" : modelData.name;
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.RightButton) {
+                                        playlistContextMenu.currentId = modelData.id;
+                                        playlistContextMenu.currentName = modelData.name;
+                                        playlistContextMenu.popup();
+                                    } else {
+                                        root.openPlaylist(modelData.id, modelData.name);
+                                    }
                                 }
                             }
 
@@ -549,11 +654,15 @@ Window {
                                 anchors.rightMargin: 12
                                 spacing: 10
 
-                                Text {
-                                    text: modelData.icon
-                                    color: modelData.color
-                                    font.pixelSize: 12
+                                Image {
+                                    Layout.preferredWidth: 14
+                                    Layout.preferredHeight: 14
+                                    source: Qt.resolvedUrl("assets/icons/playlists/" + (modelData.icon || "music") + ".svg")
+                                    sourceSize.width: 28
+                                    sourceSize.height: 28
+                                    fillMode: Image.PreserveAspectFit
                                     Layout.alignment: Qt.AlignVCenter
+                                    opacity: plHover.hovered ? 1.0 : 0.75
                                 }
 
                                 Text {
@@ -562,13 +671,7 @@ Window {
                                     font.pixelSize: 12
                                     Layout.fillWidth: true
                                     Layout.alignment: Qt.AlignVCenter
-                                }
-
-                                Text {
-                                    text: root.countInCategory(modelData.name)
-                                    color: textMute
-                                    font.pixelSize: 11
-                                    font.family: "JetBrains Mono"
+                                    elide: Text.ElideRight
                                 }
                             }
                         }
@@ -856,58 +959,61 @@ Window {
                                     }
 
                                     // Category badges (up to 3 shown) — neon style
+                                    // Playlist badges (up to 3 shown) — neon style
                                     Repeater {
-                                        model: root.getCategories(filePath).slice(0, 3)
+                                        model: {
+                                            var ids = library.playlistsForTrack(filePath);
+                                            var list = [];
+                                            for (var i = 0; i < root.userPlaylists.length; i++) {
+                                                if (ids.indexOf(root.userPlaylists[i].id) >= 0)
+                                                    list.push(root.userPlaylists[i]);
+                                            }
+                                            return list.slice(0, 3);
+                                        }
                                         delegate: Rectangle {
                                             id: badge
                                             required property var modelData
 
-                                            // Find the category color
-                                            property string catColor: {
-                                                for (var i = 0; i < root.categoryList.length; i++) {
-                                                    if (root.categoryList[i].name === modelData)
-                                                        return root.categoryList[i].color;
-                                                }
-                                                return "#8A8AA0";
-                                            }
+                                            property string catColor: modelData.color || "#22D3EE"
 
-                                            width: badgeLabel.implicitWidth + 18
-                                            height: 20
-                                            radius: 10
+                                            width: badgeLabel.implicitWidth + 20
+                                            height: 22
+                                            radius: 11
 
-                                            // Neon fill — category color at 25% alpha (AARRGGBB)
-                                            color: "#40" + badge.catColor.substring(1)
-
-                                            // Neon border — full category color
+                                            color: "#55" + badge.catColor.substring(1)
                                             border.color: badge.catColor
-                                            border.width: 1
+                                            border.width: 1.5
 
-                                            // Glow
                                             layer.enabled: true
                                             layer.effect: MultiEffect {
                                                 shadowEnabled: true
                                                 shadowColor: badge.catColor
-                                                shadowBlur: 0.6
+                                                shadowBlur: 2.0
+                                                shadowVerticalOffset: 0
+                                                shadowHorizontalOffset: 0
                                             }
 
                                             Text {
                                                 id: badgeLabel
                                                 anchors.centerIn: parent
-                                                text: modelData
-                                                color: badge.catColor
+                                                text: modelData.name
+                                                color: "#FFFFFF"
                                                 font.pixelSize: 10
                                                 font.weight: Font.Bold
-                                                font.letterSpacing: 0.3
+                                                font.letterSpacing: 0.5
+                                                layer.enabled: true
+                                                layer.effect: MultiEffect {
+                                                    shadowEnabled: true
+                                                    shadowColor: badge.catColor
+                                                    shadowBlur: 1.5
+                                                    shadowVerticalOffset: 0
+                                                    shadowHorizontalOffset: 0
+                                                }
                                             }
                                         }
                                     }
 
-                                    Text {
-                                        visible: root.getCategories(filePath).length > 3
-                                        text: "+" + (root.getCategories(filePath).length - 3)
-                                        color: textMute
-                                        font.pixelSize: 9
-                                    }
+
                                 }
 
                                 Text {
@@ -1378,12 +1484,13 @@ Window {
                 }
             }
 
-            // ============ PLAYLISTS PAGE ============
+            // ============ PLAYLIST DETAIL PAGE ============
             ColumnLayout {
+                id: playlistDetailPage
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                visible: root.currentPage === "playlists"
+                visible: root.currentPage === "playlist-detail"
 
                 Rectangle {
                     Layout.fillWidth: true
@@ -1394,110 +1501,198 @@ Window {
                         anchors.leftMargin: 28
                         anchors.rightMargin: 28
                         spacing: 14
-                        Rectangle {
-                            width: 3; height: 44
-                            Layout.alignment: Qt.AlignVCenter
-                            gradient: Gradient {
-                                GradientStop { position: 0.0; color: accentCyan }
-                                GradientStop { position: 1.0; color: accentPurple }
+
+                        Button {
+                            text: "← Back"
+                            focusPolicy: Qt.NoFocus
+                            onClicked: root.closePlaylist()
+                            background: Rectangle {
+                                implicitWidth: 82; implicitHeight: 36
+                                radius: 10
+                                color: backPLHover.hovered ? "#26FFFFFF" : "#1AFFFFFF"
+                                border.color: "#33A78BFA"
+                                border.width: 1
                             }
+                            contentItem: Text {
+                                text: parent.text
+                                color: textPrimary
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            HoverHandler { id: backPLHover }
                         }
+
                         ColumnLayout {
                             spacing: 2
-                            Text { text: "Playlists"; color: textPrimary; font.pixelSize: 26; font.weight: Font.Bold }
-                            Text { text: root.categoryList.length + " playlists"; color: textDim; font.pixelSize: 12 }
+                            Text {
+                                text: root.currentPlaylistName
+                                color: textPrimary
+                                font.pixelSize: 22
+                                font.weight: Font.Bold
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                text: root.currentPlaylistTracks.length + " track"
+                                      + (root.currentPlaylistTracks.length === 1 ? "" : "s")
+                                color: textDim
+                                font.pixelSize: 12
+                            }
                         }
+
                         Item { Layout.fillWidth: true }
+
+                        Button {
+                            text: "▶ Play all"
+                            focusPolicy: Qt.NoFocus
+                            enabled: root.currentPlaylistTracks.length > 0
+                            onClicked: root.playPlaylistTrack(0)
+                            background: Rectangle {
+                                implicitWidth: 130; implicitHeight: 40
+                                radius: 10
+                                gradient: Gradient {
+                                    GradientStop { position: 0.0; color: "#40A78BFA" }
+                                    GradientStop { position: 1.0; color: "#4022D3EE" }
+                                }
+                                border.color: accentCyan
+                                border.width: 1
+                                opacity: parent.enabled ? 1 : 0.4
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "#FFFFFF"
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
                     }
                 }
 
-                GridView {
+                ListView {
+                    id: playlistDetailList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     Layout.leftMargin: 28
                     Layout.rightMargin: 28
-                    Layout.topMargin: 12
                     Layout.bottomMargin: 24
                     clip: true
-                    cellWidth: 200
-                    cellHeight: 190
-                    model: root.categoryList
-                    delegate: Item {
-                        required property var modelData
-                        width: 200
-                        height: 190
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 184
-                            height: 174
-                            radius: 14
-                            color: "#1A1A28"
-                            border.width: 2
-                            border.color: "#22D3EE"
+                    model: root.currentPlaylistTracks
+                    spacing: 4
 
-                            SequentialAnimation on border.color {
-                                running: true
-                                loops: Animation.Infinite
-                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
-                                ColorAnimation { to: "#A78BFA"; duration: 2600 }
-                                ColorAnimation { to: "#E879F9"; duration: 2600 }
-                                ColorAnimation { to: "#22D3EE"; duration: 2600 }
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        width: playlistDetailList.width
+                        height: 52
+                        radius: 10
+                        color: plRowHover.hovered ? "#1AFFFFFF" : "transparent"
+
+                        HoverHandler { id: plRowHover }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (root.lastClickedIndex === index
+                                    && playback.currentIndex === index
+                                    && root.currentPage === "playlist-detail") {
+                                    root.showNowPlaying = true;
+                                } else {
+                                    root.playPlaylistTrack(index);
+                                    root.lastClickedIndex = index;
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 12
+
+                            Text {
+                                text: (index + 1)
+                                color: textMute
+                                font.pixelSize: 12
+                                Layout.preferredWidth: 28
+                                horizontalAlignment: Text.AlignRight
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: 36
+                                Layout.preferredHeight: 36
+                                radius: 8
+                                color: bgPanel
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    source: modelData.coverUrl
+                                    fillMode: Image.PreserveAspectCrop
+                                    visible: modelData.coverUrl !== ""
+                                    asynchronous: true
+                                }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "♪"
+                                    color: accentCyan
+                                    font.pixelSize: 16
+                                    visible: modelData.coverUrl === ""
+                                }
                             }
 
                             ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 8
-
-                                Item {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 90
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: 70; height: 70
-                                        radius: 35
-                                        color: modelData.color + "33"
-                                        border.color: modelData.color
-                                        border.width: 2
-                                    }
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.name.charAt(0).toUpperCase()
-                                        color: modelData.color
-                                        font.pixelSize: 32
-                                        font.weight: Font.Bold
-                                    }
-                                }
-
+                                Layout.fillWidth: true
+                                spacing: 2
                                 Text {
                                     Layout.fillWidth: true
-                                    text: modelData.name
+                                    text: modelData.title
                                     color: textPrimary
-                                    font.pixelSize: 14
-                                    font.weight: Font.Bold
-                                    horizontalAlignment: Text.AlignHCenter
+                                    font.pixelSize: 13
+                                    font.weight: Font.Medium
+                                    elide: Text.ElideRight
                                 }
                                 Text {
                                     Layout.fillWidth: true
-                                    text: root.countInCategory(modelData.name) + " track" + (root.countInCategory(modelData.name) === 1 ? "" : "s")
-                                    color: textMute
+                                    text: modelData.artist + " · " + modelData.album
+                                    color: textDim
                                     font.pixelSize: 11
-                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
                                 }
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.currentPage = "library";
-                                    root.currentCategory = modelData.name;
+                            Text {
+                                text: modelData.durationText
+                                color: textDim
+                                font.pixelSize: 12
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                radius: 6
+                                color: plRemoveHover.hovered ? "#33F87171" : "transparent"
+                                HoverHandler { id: plRemoveHover }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "✕"
+                                    color: plRemoveHover.hovered ? "#F87171" : textMute
+                                    font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.removeFromCurrentPlaylist(modelData.filePath)
                                 }
                             }
                         }
                     }
                 }
             }
+
+
 
         }
 
@@ -1970,31 +2165,75 @@ Window {
     //  CATEGORY MENU (popup on ⋯)
     // =================================================================
     Menu {
-        id: categoryMenu
-        property string currentPath: ""
+        id: playlistContextMenu
+        property int    currentId: -1
+        property string currentName: ""
 
         background: Rectangle {
-            implicitWidth: 200
+            implicitWidth: 180
             color: "#E60E0E16"
             border.color: "#6622D3EE"
             border.width: 1
             radius: 12
-
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                shadowColor: "#3322D3EE"
-                shadowBlur: 0.6
-            }
         }
 
         MenuItem {
             contentItem: Text {
-                text: "  Choose category"
+                text: "  Rename"
+                color: "#F2F2F7"
+                font.pixelSize: 12
+                leftPadding: 8
+            }
+            background: Rectangle {
+                color: parent.hovered ? "#1AFFFFFF" : "transparent"
+                radius: 6
+            }
+            onTriggered: root.openEditPlaylist(
+                playlistContextMenu.currentId,
+                playlistContextMenu.currentName
+            )
+        }
+
+        MenuItem {
+            contentItem: Text {
+                text: "  Delete"
+                color: "#F87171"
+                font.pixelSize: 12
+                leftPadding: 8
+            }
+            background: Rectangle {
+                color: parent.hovered ? "#1AF87171" : "transparent"
+                radius: 6
+            }
+            onTriggered: {
+                library.deletePlaylist(playlistContextMenu.currentId);
+                root.refreshPlaylists();
+                if (root.currentPlaylistId === playlistContextMenu.currentId)
+                    root.closePlaylist();
+            }
+        }
+    }
+
+    Menu {
+        id: categoryMenu
+        property string currentPath: ""
+
+        background: Rectangle {
+            implicitWidth: 220
+            color: "#E60E0E16"
+            border.color: "#6622D3EE"
+            border.width: 1
+            radius: 12
+        }
+
+        MenuItem {
+            contentItem: Text {
+                text: "  Add to playlist"
                 color: "#8A8AA0"
                 font.pixelSize: 10
                 font.letterSpacing: 1.5
                 font.weight: Font.Bold
+                leftPadding: 8
             }
             enabled: false
             background: Item {}
@@ -2008,31 +2247,8 @@ Window {
             }
         }
 
-        // "Remove from category" (only shows if already has category)
-        MenuItem {
-            visible: categoryMenu.currentPath !== "" &&
-                     root.getCategory(categoryMenu.currentPath) !== ""
-            contentItem: Text {
-                text: "  ✕  Remove from category"
-                color: "#F87171"
-                font.pixelSize: 12
-                leftPadding: 8
-            }
-            background: Rectangle {
-                color: parent.hovered ? "#1AF87171" : "transparent"
-                radius: 6
-            }
-            onTriggered: {
-                var copy = Object.assign({}, root.trackCategories);
-                delete copy[categoryMenu.currentPath];
-                root.trackCategories = copy;
-                categorySettings.categoriesJson = JSON.stringify(copy);
-            }
-        }
-
-        // Category options
         Repeater {
-            model: root.categoryList
+            model: root.userPlaylists || []
             delegate: MenuItem {
                 required property var modelData
                 contentItem: RowLayout {
@@ -2042,28 +2258,29 @@ Window {
                     anchors.rightMargin: 12
 
                     Text {
-                        text: root.hasCategory(categoryMenu.currentPath, modelData.name) ? "✓" : ""
-                        color: modelData.color
-                        font.pixelSize: 12
+                        text: {
+                            var ids = library.playlistsForTrack(categoryMenu.currentPath);
+                            return ids.indexOf(modelData.id) >= 0 ? "\u2713" : "+";
+                        }
+                        color: modelData.color || "#22D3EE"
+                        font.pixelSize: 14
                         font.weight: Font.Bold
-                        Layout.preferredWidth: 12
                         Layout.alignment: Qt.AlignVCenter
                     }
 
                     Rectangle {
                         width: 8; height: 8; radius: 4
-                        color: modelData.color
+                        color: modelData.color || "#22D3EE"
                         Layout.alignment: Qt.AlignVCenter
                     }
 
                     Text {
                         text: modelData.name
-                        color: root.hasCategory(categoryMenu.currentPath, modelData.name)
-                            ? modelData.color
-                            : "#8A8AA0"
+                        color: modelData.color || "#22D3EE"
                         font.pixelSize: 12
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
+                        elide: Text.ElideRight
                     }
                 }
                 background: Rectangle {
@@ -2071,9 +2288,31 @@ Window {
                     radius: 6
                 }
                 onTriggered: {
-                    root.toggleCategory(categoryMenu.currentPath, modelData.name);
+                    if (categoryMenu.currentPath !== "") {
+                        var ids = library.playlistsForTrack(categoryMenu.currentPath);
+                        if (ids.indexOf(modelData.id) >= 0) {
+                            library.removeTrackFromPlaylist(modelData.id, categoryMenu.currentPath);
+                            console.log("VOID: removed from playlist", modelData.name);
+                        } else {
+                            library.addTrackToPlaylist(modelData.id, categoryMenu.currentPath);
+                            console.log("VOID: added to playlist", modelData.name);
+                        }
+                        root.refreshPlaylists();
+                    }
                 }
             }
+        }
+
+        MenuItem {
+            visible: root.userPlaylists.length === 0
+            enabled: false
+            contentItem: Text {
+                text: "  (no playlists yet — click + in sidebar)"
+                color: "#55556A"
+                font.pixelSize: 11
+                leftPadding: 8
+            }
+            background: Item {}
         }
     }
 
@@ -2786,7 +3025,7 @@ Window {
                 border.color: "#6622D3EE"
                 border.width: 1
 
-                opacity: npVolHover.hovered || npVolSlider.hovered || npVolSlider.pressed ? 1 : 0
+                opacity: (npVolHover.hovered || npVolSlider.hovered || npVolSlider.pressed || root.showVolumeFromKeyboard) ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 180 } }
 
@@ -3062,5 +3301,242 @@ Window {
         if (!ms || ms < 0) return "0:00";
         const s = Math.floor(ms / 1000);
         return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    }
+
+    // =================================================================
+    //  KEYBOARD SHORTCUTS
+    // =================================================================
+    Timer {
+        id: leftTapTimer
+        interval: 280
+        onTriggered: root.arrowLeftPending = false
+    }
+    Timer {
+        id: volumePanelTimer
+        interval: 1200
+        onTriggered: root.showVolumeFromKeyboard = false
+    }
+
+    Timer {
+        id: volumeToastTimer
+        interval: 1200
+        onTriggered: root.showVolumeToast = false
+    }
+    Timer {
+        id: rightTapTimer
+        interval: 280
+        onTriggered: root.arrowRightPending = false
+    }
+
+    readonly property bool shortcutsEnabled: !root.showPlaylistManager && !root.textFieldFocused
+
+    // ── Play / Pause ──────────────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Space"
+        enabled: root.shortcutsEnabled
+        onActivated: playback.playPause()
+    }
+
+    // ── ← : seek -5s  |  ← ← : previous track ────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Left"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            if (root.arrowLeftPending) {
+                leftTapTimer.stop();
+                root.arrowLeftPending = false;
+                playback.previous();
+            } else {
+                root.arrowLeftPending = true;
+                leftTapTimer.restart();
+                playback.seek(Math.max(0, playback.position - 5000));
+            }
+        }
+    }
+
+    // ── → : seek +5s  |  → → : next track ───────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Right"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            if (root.arrowRightPending) {
+                rightTapTimer.stop();
+                root.arrowRightPending = false;
+                playback.next();
+            } else {
+                root.arrowRightPending = true;
+                rightTapTimer.restart();
+                playback.seek(Math.min(playback.duration, playback.position + 5000));
+            }
+        }
+    }
+
+    // ── ↑ / ↓ : volume ±5 ────────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Up"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            playback.volume = Math.min(100, playback.volume + 5);
+            root.isMuted = false;
+            root.showVolumeFromKeyboard = true;
+            volumePanelTimer.restart();
+        }
+    }
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Down"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            playback.volume = Math.max(0, playback.volume - 5);
+            root.isMuted = false;
+            root.showVolumeFromKeyboard = true;
+            volumePanelTimer.restart();
+        }
+    }
+
+    // ── Ctrl+← / Ctrl+→ : seek ±30s ──────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Ctrl+Left"
+        enabled: root.shortcutsEnabled
+        onActivated: playback.seek(Math.max(0, playback.position - 30000))
+    }
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Ctrl+Right"
+        enabled: root.shortcutsEnabled
+        onActivated: playback.seek(Math.min(playback.duration, playback.position + 30000))
+    }
+
+    // ── M : mute toggle ──────────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "M"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            if (root.isMuted) {
+                playback.volume = root.lastVolume;
+                root.isMuted = false;
+            } else {
+                root.lastVolume = playback.volume;
+                playback.volume = 0;
+                root.isMuted = true;
+            }
+            root.showVolumeFromKeyboard = true;
+            volumePanelTimer.restart();
+        }
+    }
+
+    // ── L : toggle lyrics panel ──────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "L"
+        enabled: root.shortcutsEnabled
+        onActivated: root.showLyrics = !root.showLyrics
+    }
+
+    // ── N : Now Playing view ─────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "N"
+        enabled: root.shortcutsEnabled
+        onActivated: root.showNowPlaying = !root.showNowPlaying
+    }
+
+    // ── / : focus search ─────────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "/"
+        enabled: root.shortcutsEnabled
+        onActivated: {
+            if (typeof searchFocus !== "undefined")
+                searchFocus.forceActiveFocus();
+        }
+    }
+
+    // ── Esc : back / clear / close ───────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Escape"
+        enabled: true
+        onActivated: {
+            if (root.showNowPlaying) {
+                root.showNowPlaying = false;
+            } else if (root.showLyricsDialog) {
+                root.showLyricsDialog = false;
+            } else if (root.textFieldFocused && typeof searchFocus !== "undefined") {
+                searchFocus.text = "";
+                searchFocus.focus = false;
+            }
+        }
+    }
+
+    // ── 1 / 2 / 3 : quick nav ────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "1"
+        enabled: root.shortcutsEnabled
+        onActivated: root.currentPage = "library"
+    }
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "2"
+        enabled: root.shortcutsEnabled
+        onActivated: root.currentPage = "albums"
+    }
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "3"
+        enabled: root.shortcutsEnabled
+        onActivated: root.currentPage = "artists"
+    }
+
+    // ── Ctrl+Q : quit ────────────────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "Ctrl+Q"
+        enabled: true
+        onActivated: Qt.quit()
+    }
+
+    // ── F11 : fullscreen toggle ──────────────────────────────
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "F11"
+        enabled: true
+        onActivated: {
+            root.visibility = (root.visibility === Window.FullScreen)
+                ? Window.Windowed : Window.FullScreen;
+        }
+    }
+
+    PlaylistManager {
+        id: playlistManagerDialog
+        anchors.fill: parent
+        visible: root.showPlaylistManager
+        opacity: visible ? 1 : 0
+        z: 250
+
+        Behavior on opacity { NumberAnimation { duration: 220 } }
+
+        mode: root.playlistManagerMode
+        editId: root.playlistEditId
+        editCurrentName: root.playlistEditName
+
+        accentCyan:   root.accentCyan
+        accentPurple: root.accentPurple
+        textPrimary:  root.textPrimary
+        textDim:      root.textDim
+        textMute:     root.textMute
+        bgPanel:      root.bgPanel
+
+        onCloseRequested: {
+            root.showPlaylistManager = false;
+            root.refreshPlaylists();
+        }
     }
 }

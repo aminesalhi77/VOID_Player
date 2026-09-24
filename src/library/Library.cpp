@@ -1,4 +1,5 @@
 #include "library/Library.h"
+#include <QVariantMap>
 #include "metadata/TagReader.h"
 
 #include <QDirIterator>
@@ -231,3 +232,57 @@ bool Library::saveArtistImage(const QString& artist, const QString& url) {
 QString Library::loadArtistImage(const QString& artist) const {
     return m_db.loadArtistImage(artist);
 }
+
+// ===== Playlists =====
+
+QVariantList Library::listPlaylists() const {
+    QVariantList list;
+    for (const auto& p : m_db.listPlaylists()) {
+        QVariantMap m;
+        m["id"]    = p.id;
+        m["name"]  = p.name;
+        m["icon"]  = p.icon;
+        m["color"] = p.color;
+        list.append(m);
+    }
+    return list;
+}
+
+int Library::createPlaylist(const QString& name, const QString& icon, const QString& color) {
+    return m_db.createPlaylist(name, icon, color);
+}
+
+bool Library::renamePlaylist(int id, const QString& name) {
+    return m_db.renamePlaylist(id, name);
+}
+
+bool Library::updatePlaylistIcon(int id, const QString& icon, const QString& color) {
+    return m_db.updatePlaylistIcon(id, icon, color);
+}
+
+bool Library::deletePlaylist(int id) {
+    return m_db.deletePlaylist(id);
+}
+
+QVariantList Library::playlistTracks(int playlistId) const {
+    QVariantList list;
+    for (const QString& p : m_db.playlistTrackPaths(playlistId))
+        list.append(p);
+    return list;
+}
+
+bool Library::addTrackToPlaylist(int playlistId, const QString& filePath) {
+    return m_db.addTrackToPlaylist(playlistId, filePath);
+}
+
+bool Library::removeTrackFromPlaylist(int playlistId, const QString& filePath) {
+    return m_db.removeTrackFromPlaylist(playlistId, filePath);
+}
+
+QVariantList Library::playlistsForTrack(const QString& filePath) const {
+    QVariantList list;
+    for (int id : m_db.playlistsForTrack(filePath))
+        list.append(id);
+    return list;
+}
+

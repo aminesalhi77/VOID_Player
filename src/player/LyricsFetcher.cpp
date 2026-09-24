@@ -16,7 +16,7 @@ LyricsFetcher::LyricsFetcher(QObject* parent)
     , m_timeoutTimer(new QTimer(this))
 {
     m_timeoutTimer->setSingleShot(true);
-    m_timeoutTimer->setInterval(8000);   // 8s timeout per request
+    m_timeoutTimer->setInterval(3500);   // 8s timeout per request
 
     connect(m_timeoutTimer, &QTimer::timeout, this, [this]() {
         if (m_currentReply) {

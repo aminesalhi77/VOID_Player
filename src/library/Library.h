@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QList>
 #include <QString>
+#include <QVariantList>
 #include <QSet>
 #include "library/Track.h"
 #include "library/LibraryDb.h"
@@ -57,6 +58,19 @@ public:
     int scanTotal() const { return m_scanTotal; }
     int trackCount() const { return m_tracks.size(); }
 
+
+    // ===== Playlists (QML-exposed) =====
+    // These are DECLARATIONS only — implementations in Library.cpp
+    Q_INVOKABLE QVariantList listPlaylists() const;
+    Q_INVOKABLE int  createPlaylist(const QString& name, const QString& icon, const QString& color);
+    Q_INVOKABLE bool renamePlaylist(int id, const QString& name);
+    Q_INVOKABLE bool updatePlaylistIcon(int id, const QString& icon, const QString& color);
+    Q_INVOKABLE bool deletePlaylist(int id);
+    Q_INVOKABLE QVariantList playlistTracks(int playlistId) const;
+    Q_INVOKABLE bool addTrackToPlaylist(int playlistId, const QString& filePath);
+    Q_INVOKABLE bool removeTrackFromPlaylist(int playlistId, const QString& filePath);
+    Q_INVOKABLE QVariantList playlistsForTrack(const QString& filePath) const;
+
 signals:
     void scanStarted();
     void scanProgress(int current, int total);
@@ -69,7 +83,7 @@ signals:
 private:
     QList<Track> m_tracks;
     QSet<QString> m_seenPaths;
-    LibraryDb m_db;    // ← NEW — prevents duplicates
+    LibraryDb m_db;
     bool m_scanning = false;
     int m_scanCurrent = 0;
     int m_scanTotal = 0;

@@ -42,6 +42,8 @@ qt_add_executable(void
 set_source_files_properties(qml/theme/Theme.qml PROPERTIES
     QT_QML_SINGLETON_TYPE TRUE
 )
+file(GLOB PLAYLIST_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "qml/assets/icons/playlists/*.svg")
+
 qt_add_qml_module(void
     URI Void
     VERSION 1.0
@@ -51,13 +53,19 @@ qt_add_qml_module(void
         qml/components/ArtistDetail.qml
         qml/components/LyricsPanel.qml
         qml/components/LyricsSyncDialog.qml
+        qml/components/PlaylistManager.qml
+        qml/components/FocusKiller.qml
+        qml/theme/Theme.qml
     RESOURCES
-    qml/theme/Theme.qml
         qml/assets/icons/disc.svg
         qml/assets/icons/bars.svg
         qml/assets/background/bg.png
         qml/assets/background/vortex.png
-        qml/components/FocusKiller.qml
+        qml/assets/icons/playlists/sidebar-library.svg
+        qml/assets/icons/playlists/sidebar-albums.svg
+        qml/assets/icons/playlists/sidebar-artists.svg
+        qml/assets/icons/playlists/sidebar-playlists.svg
+        ${PLAYLIST_ICONS}
 )
 
 target_include_directories(void PRIVATE

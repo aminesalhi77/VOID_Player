@@ -72,6 +72,25 @@ bool LibraryDb::createSchema() {
         ")"
     )) return false;
 
+    if (!q.exec(
+        "CREATE TABLE IF NOT EXISTS user_playlists ("
+        "  id       INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  name     TEXT NOT NULL,"
+        "  icon     TEXT,"
+        "  color    TEXT"
+        ")"
+    )) return false;
+
+    if (!q.exec(
+        "CREATE TABLE IF NOT EXISTS playlist_tracks ("
+        "  playlist_id  INTEGER,"
+        "  file_path    TEXT,"
+        "  position     INTEGER,"
+        "  PRIMARY KEY (playlist_id, file_path),"
+        "  FOREIGN KEY (playlist_id) REFERENCES user_playlists(id) ON DELETE CASCADE"
+        ")"
+    )) return false;
+
     return q.exec(
         "CREATE TABLE IF NOT EXISTS custom_lyrics ("
         "  file_path  TEXT PRIMARY KEY,"
@@ -272,3 +291,102 @@ bool LibraryDb::removeCachedLyrics(const QString& filePath) {
     q.addBindValue(filePath);
     return q.exec();
 }
+
+// ============================================================
+//  User playlists — implementations
+// ============================================================
+
+QList<LibraryDb::Playlist> LibraryDb::listPlaylists() const {
+    QList<Playlist> result;
+    QSqlQuery q(m_db);
+    if (!q.exec("SELECT id, name, icon, color FROM user_playlists ORDER BY name"))
+        return result;
+    while (q.next()) {
+        Playlist p;
+        p.id    = q.value(0).toInt();
+        p.name  = q.value(1).toString();
+        p.icon  = q.value(2).toString();
+        p.color = q.value(3).toString();
+        result.append(p);
+    }
+    return result;
+}
+
+int LibraryDb::createPlaylist(const QString& name, const QString& icon, const QString& color) {
+    QSqlQuery q(m_db);
+    q.prepare("INSERT INTO user_playlists (name, icon, color) VALUES (?, ?, ?)");
+    q.addBindValue(name);
+    q.addBindValue(icon);
+    q.addBindValue(color);
+    if (!q.exec()) return -1;
+    return q.lastInsertId().toInt();
+}
+
+bool LibraryDb::renamePlaylist(int id, const QString& name) {
+    QSqlQuery q(m_db);
+    q.prepare("UPDATE user_playlists SET name = ? WHERE id = ?");
+    q.addBindValue(name);
+    q.addBindValue(id);
+    return q.exec();
+}
+
+bool LibraryDb::updatePlaylistIcon(int id, const QString& icon, const QString& color) {
+    QSqlQuery q(m_db);
+    q.prepare("UPDATE user_playlists SET icon = ?, color = ? WHERE id = ?");
+    q.addBindValue(icon);
+    q.addBindValue(color);
+    q.addBindValue(id);
+    return q.exec();
+}
+
+bool LibraryDb::deletePlaylist(int id) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM playlist_tracks WHERE playlist_id = ?");
+    q.addBindValue(id);
+    q.exec();
+    q.prepare("DELETE FROM user_playlists WHERE id = ?");
+    q.addBindValue(id);
+    return q.exec();
+}
+
+QList<QString> LibraryDb::playlistTrackPaths(int playlistId) const {
+    QList<QString> result;
+    QSqlQuery q(m_db);
+    q.prepare("SELECT file_path FROM playlist_tracks WHERE playlist_id = ? ORDER BY position");
+    q.addBindValue(playlistId);
+    if (!q.exec()) return result;
+    while (q.next()) result.append(q.value(0).toString());
+    return result;
+}
+
+bool LibraryDb::addTrackToPlaylist(int playlistId, const QString& filePath) {
+    QSqlQuery q(m_db);
+    q.prepare("SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_tracks WHERE playlist_id = ?");
+    q.addBindValue(playlistId);
+    int nextPos = 0;
+    if (q.exec() && q.next()) nextPos = q.value(0).toInt();
+    q.prepare("INSERT OR IGNORE INTO playlist_tracks (playlist_id, file_path, position) VALUES (?, ?, ?)");
+    q.addBindValue(playlistId);
+    q.addBindValue(filePath);
+    q.addBindValue(nextPos);
+    return q.exec();
+}
+
+bool LibraryDb::removeTrackFromPlaylist(int playlistId, const QString& filePath) {
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM playlist_tracks WHERE playlist_id = ? AND file_path = ?");
+    q.addBindValue(playlistId);
+    q.addBindValue(filePath);
+    return q.exec();
+}
+
+QList<int> LibraryDb::playlistsForTrack(const QString& filePath) const {
+    QList<int> result;
+    QSqlQuery q(m_db);
+    q.prepare("SELECT playlist_id FROM playlist_tracks WHERE file_path = ?");
+    q.addBindValue(filePath);
+    if (!q.exec()) return result;
+    while (q.next()) result.append(q.value(0).toInt());
+    return result;
+}
+

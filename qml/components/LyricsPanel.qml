@@ -6,7 +6,10 @@ import QtQuick.Effects
 Item {
     id: root
 
-    // Data — set by Main.qml
+    signal addLyricsRequested()
+    signal refreshRequested()
+    signal seekRequested(int timeMs)
+
     property string artistName: ""
     property string trackTitle: ""
     property string albumName: ""
@@ -14,104 +17,188 @@ Item {
     property int currentPositionMs: 0
     property string filePath: ""
 
-    signal addLyricsRequested()
-    signal refreshRequested()
-
-    // Colors
     property color accentCyan:   "#22D3EE"
     property color accentPurple: "#A78BFA"
     property color textPrimary:  "#F2F2F7"
     property color textDim:      "#8A8AA0"
     property color textMute:     "#55556A"
 
-    // Signal — user clicked a lyric line to seek
-    signal seekRequested(int timeMs)
+    // ============ HELPERS ============
+    function getLineColor(synced, current, near) {
+        if (!synced) return root.textDim;
+        if (current) return root.textPrimary;
+        if (near) return "#B0B0C0";
+        return root.textMute;
+    }
 
-    // Fetch on track change
-    onTrackTitleChanged: {
-        if (trackTitle === "") return;
+    // ============ AUTO TRIGGER on track change ============
+    onFilePathChanged: {
+        if (filePath !== "") {
+            lyrics.clear();
+            trackChangeDebounce.restart();
+        }
+    }
 
-        // Priority 1: user-entered lyrics
-        if (filePath !== "" && library.hasCustomLyrics(filePath)) {
-            var txt = library.loadCustomLyrics(filePath);
-            var synced = library.customLyricsSynced(filePath);
+    Timer {
+        id: trackChangeDebounce
+        interval: 40
+        repeat: false
+        onTriggered: loadLyricsForTrack()
+    }
+
+    // Poll position every 200ms → drives the highlight.
+    // More reliable than Connections on context properties.
+    Timer {
+        id: positionPoller
+        interval: 200
+        repeat: true
+        running: playback.currentIndex >= 0
+        onTriggered: {
+            lyrics.setPosition(playback.position);
+        }
+    }
+
+    Connections {
+        target: playback
+        function onTrackChanged() {
+            lyrics.clear();
+            trackChangeDebounce.restart();
+        }
+    }
+
+    // ============ ACTIONS ============
+    function loadLyricsForTrack() {
+        var fp = playback.filePath;
+        if (fp === "") return;
+
+        if (library.hasCustomLyrics(fp)) {
+            var txt = library.loadCustomLyrics(fp);
+            var synced = library.customLyricsSynced(fp);
             lyrics.loadCustomText(txt, synced);
             return;
         }
 
-        // Priority 2: cached auto-fetched lyrics
-        if (filePath !== "" && library.hasCachedLyrics(filePath)) {
-            var ct = library.loadCachedLyrics(filePath);
-            var cs = library.cachedLyricsSynced(filePath);
-            lyrics.loadCustomText(ct, cs);
-            return;
-        }
-
-        // Priority 3: fetch from the internet
-        lyrics.fetch(artistName, trackTitle, albumName, durationSec);
+        lyrics.fetchForFile(fp,
+                             playback.artist,
+                             playback.title,
+                             playback.album,
+                             Math.floor(playback.duration / 1000));
     }
 
+    function saveLyricsToCache() {
+        var fp = playback.filePath;
+        if (fp === "") return;
+        if (lyrics.lines.length === 0) return;
 
-    Connections {
-        target: lyrics
-        function onStatusChanged() {
-            if (lyrics.status === "found") {
-                root.saveLyricsToCache();
+        var text = "";
+        for (var i = 0; i < lyrics.lines.length; i++) {
+            var l = lyrics.lines[i];
+            if (lyrics.synced && l.timeMs > 0) {
+                var s = l.timeMs / 1000.0;
+                var m = Math.floor(s / 60);
+                var sec = s - m * 60;
+                var minStr = (m < 10 ? "0" : "") + m;
+                var secStr = (sec < 10 ? "0" : "") + sec.toFixed(2);
+                text += "[" + minStr + ":" + secStr + "] " + l.text + "\n";
+            } else {
+                text += l.text + "\n";
             }
         }
+        var src = lyrics.source === "" ? "manual" : lyrics.source;
+        library.saveCachedLyrics(fp, text, lyrics.synced, src);
     }
 
-    // Update highlight position from playback — hard binding
-    Connections {
-        target: playback
-        function onPositionChanged() {
-            lyrics.setPosition(playback.position);
-        }
-        function onTrackChanged() {
-            lyrics.setPosition(0);
-        }
-    }
-
-    // Refresh button (top-right of panel)
-    Rectangle {
-        id: refreshBtn
+    // ============ TOP-RIGHT BUTTONS ============
+    RowLayout {
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.topMargin: 8
         anchors.rightMargin: 8
-        width: 32; height: 32
-        radius: 8
+        spacing: 6
         z: 100
-        color: refreshHover.hovered ? "#33A78BFA" : "#1AA78BFA"
-        border.color: root.accentPurple
-        border.width: 1
-        Behavior on color { ColorAnimation { duration: 140 } }
 
-        HoverHandler { id: refreshHover }
+        // ---- Save to DB (C) ----
+        Rectangle {
+            id: saveBtn
+            width: 34; height: 34
+            radius: 17
+            color: saveHover.hovered ? "#33A78BFA" : "#1AA78BFA"
+            border.color: root.accentCyan
+            border.width: 1
+            Behavior on color { ColorAnimation { duration: 180 } }
 
-        Text {
-            anchors.centerIn: parent
-            text: "⟳"
-            color: root.accentCyan
-            font.pixelSize: 16
-            font.weight: Font.Bold
+            HoverHandler { id: saveHover }
 
-            RotationAnimation on rotation {
-                running: lyrics.status === "loading"
-                loops: Animation.Infinite
-                from: 0; to: 360
-                duration: 1000
+            Text {
+                anchors.centerIn: parent
+                text: "C"
+                color: root.accentCyan
+                font.pixelSize: 16
+                font.weight: Font.Bold
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    saveBtn.scale = 1.2;
+                    saveFlash.start();
+                    root.saveLyricsToCache();
+                }
+            }
+
+            SequentialAnimation {
+                id: saveFlash
+                PropertyAnimation {
+                    target: saveBtn; property: "scale"
+                    to: 1.0; duration: 200
+                    easing.type: Easing.OutBack
+                }
             }
         }
 
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.refreshRequested()
+        // ---- Refresh (⟳) ----
+        Rectangle {
+            id: refreshBtn
+            width: 34; height: 34
+            radius: 17
+            color: refreshHover.hovered ? "#33A78BFA" : "#1AA78BFA"
+            border.color: root.accentPurple
+            border.width: 1
+            Behavior on color { ColorAnimation { duration: 180 } }
+
+            HoverHandler { id: refreshHover }
+
+            Text {
+                id: refreshIcon
+                anchors.centerIn: parent
+                text: "⟳"
+                color: root.accentCyan
+                font.pixelSize: 18
+                font.weight: Font.Bold
+            }
+
+            RotationAnimation on rotation {
+                id: refreshSpin
+                running: false
+                from: 0; to: 360
+                duration: 700
+                easing.type: Easing.OutCubic
+                onStopped: refreshIcon.rotation = 0
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    refreshSpin.start();
+                    root.refreshRequested();
+                }
+            }
         }
     }
 
-    // Loading indicator
+    // ============ LOADING STATE ============
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 16
@@ -133,7 +220,7 @@ Item {
             }
 
             SequentialAnimation on scale {
-                running: root.visible && (lyrics.status === "loading" || lyrics.status === "idle")
+                running: root.visible
                 loops: Animation.Infinite
                 NumberAnimation { to: 1.1; duration: 900; easing.type: Easing.InOutSine }
                 NumberAnimation { to: 0.92; duration: 900; easing.type: Easing.InOutSine }
@@ -155,7 +242,7 @@ Item {
         }
     }
 
-    // Not found state
+    // ============ NOT FOUND STATE ============
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 12
@@ -211,7 +298,7 @@ Item {
         }
     }
 
-    // Lyrics list
+    // ============ LYRICS LIST ============
     ListView {
         id: lyricsList
         anchors.fill: parent
@@ -225,12 +312,6 @@ Item {
         spacing: 12
         boundsBehavior: Flickable.StopAtBounds
 
-        // Scroll to current line
-        function scrollToCurrent() {
-            if (lyrics.currentLine < 0) return;
-            positionViewAtIndex(lyrics.currentLine, ListView.Center);
-        }
-
         Connections {
             target: lyrics
             function onCurrentLineChanged() {
@@ -239,12 +320,10 @@ Item {
                 }
             }
             function onLinesChanged() {
-                // Reset to top when lyrics change
                 lyricsList.positionViewAtBeginning();
             }
         }
 
-        // Smooth scroll behavior
         Behavior on contentY {
             NumberAnimation {
                 duration: 500
@@ -258,126 +337,61 @@ Item {
             required property int index
 
             width: lyricsList.width
-            height: {
-                var base = Math.max(48, textItem.implicitHeight + 20);
-                return isCurrent ? base + 8 : base;
-            }
+            height: Math.max(40, textItem.implicitHeight + 16)
 
             property bool isCurrent: index === lyrics.currentLine
             property bool isNear: Math.abs(index - lyrics.currentLine) <= 2
             property bool isSynced: lyrics.synced
 
-            // Animate the height so the layout "breathes"
-            Behavior on height {
-                NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
-            }
-
-            // Slide the whole line slightly right when it's the current one
-            transform: Translate {
-                x: lineItem.isCurrent && lineItem.isSynced ? 12 : 0
-                Behavior on x {
-                    NumberAnimation {
-                        duration: 420
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 1.4
-                    }
-                }
-            }
-
-            // Neon accent bar on the left of the current line
+            // Soft glow behind the current line
             Rectangle {
-                id: accentBar
-                anchors.left: parent.left
-                anchors.leftMargin: 4
-                anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: parent.height * 0.7
-                radius: 1.5
-                color: root.accentCyan
-
-                opacity: lineItem.isCurrent && lineItem.isSynced ? 1.0 : 0.0
-                scale: lineItem.isCurrent && lineItem.isSynced ? 1.0 : 0.3
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 340
-                        easing.type: Easing.OutCubic
-                    }
+                anchors.fill: parent
+                anchors.margins: -12
+                visible: lineItem.isCurrent && lineItem.isSynced
+                radius: 12
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 0.5; color: "#2522D3EE" }
+                    GradientStop { position: 1.0; color: "transparent" }
                 }
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 420
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 1.6
-                    }
-                }
-
-                layer.enabled: lineItem.isCurrent && lineItem.isSynced
+                layer.enabled: true
                 layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowColor: root.accentCyan
-                    shadowBlur: 1.0
+                    blurEnabled: true
+                    blur: 1.0
+                    blurMax: 48
                 }
             }
 
-            // The text itself
             Text {
                 id: textItem
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.left: accentBar.right
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 12
+                width: parent.width
                 text: modelData.text
-                color: {
-                    if (!lineItem.isSynced) return root.textDim;
-                    if (lineItem.isCurrent) return "#FFFFFF";
-                    if (lineItem.isNear) return "#A0A0B8";
-                    return root.textMute;
-                }
-                font.pixelSize: lineItem.isCurrent ? 24 : 17
+                color: lineItem.isSynced
+                       ? (lineItem.isCurrent ? root.textPrimary
+                          : (lineItem.isNear ? "#B0B0C0" : root.textMute))
+                       : root.textDim
+                font.pixelSize: lineItem.isCurrent ? 22 : 17
                 font.weight: lineItem.isCurrent ? Font.Bold : Font.Normal
-                font.letterSpacing: lineItem.isCurrent ? 0.3 : 0
-                horizontalAlignment: Text.AlignLeft
+                horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
                 opacity: lineItem.isSynced
-                       ? (lineItem.isCurrent ? 1.0 : (lineItem.isNear ? 0.75 : 0.35))
-                       : 0.9
+                         ? (lineItem.isCurrent ? 1.0
+                            : (lineItem.isNear ? 0.85 : 0.55))
+                         : 0.9
 
-                // Scale pop on the current line
-                scale: lineItem.isCurrent && lineItem.isSynced ? 1.0 : 0.98
-                transformOrigin: Item.Left
+                Behavior on font.pixelSize { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on color { ColorAnimation { duration: 220 } }
+                Behavior on opacity { NumberAnimation { duration: 220 } }
 
-                // Bright glow on the current line
                 layer.enabled: lineItem.isCurrent && lineItem.isSynced
                 layer.effect: MultiEffect {
                     shadowEnabled: true
                     shadowColor: root.accentCyan
-                    shadowBlur: 1.2
-                }
-
-                Behavior on font.pixelSize {
-                    NumberAnimation {
-                        duration: 400
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 1.3
-                    }
-                }
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 380
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on color {
-                    ColorAnimation { duration: 380 }
-                }
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 420
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 1.5
-                    }
+                    shadowBlur: 2.0
+                    shadowVerticalOffset: 0
+                    shadowHorizontalOffset: 0
                 }
             }
 
@@ -391,15 +405,6 @@ Item {
                     root.seekRequested(ms);
                 }
             }
-        }
-
-        // Empty state
-        Text {
-            anchors.centerIn: parent
-            visible: lyricsList.count === 0
-            text: "No lyrics available"
-            color: root.textMute
-            font.pixelSize: 14
         }
     }
 }
